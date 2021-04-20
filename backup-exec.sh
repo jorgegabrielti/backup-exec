@@ -67,10 +67,10 @@ done
 # ---
 for FILE in ${INCLUDE}; do
     parse ${FILE}
+    for ((i=0; i<$(wc -l .queue.db | cut -d' ' -f1); i++)); do 
+        JOB[$i]=$(head -n$(($i+1)) .queue.db | tail -n1 | cut -d':' -f2)
+        export ${JOB[$i]}
+        make_backup $HOST $NAME $DIR_BACKUP $FILE
+    done
 done
 
-for ((i=0; i<$(wc -l .queue.db | cut -d' ' -f1); i++)); do 
-    JOB[$i]=$(head -n$(($i+1)) .queue.db | tail -n1 | cut -d':' -f2)
-    export ${JOB[$i]}
-    make_backup $NAME $DIR_BACKUP $FILE
-done
