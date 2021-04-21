@@ -19,7 +19,7 @@ parse () {
         | cut -d':' -f1 \
         | paste -s \
         | tr -s '[:blank:]' ',')
-
+        
         JOB_CONFIG[$j]=$(sed ''${INTERVAL[$j]}'!d' "$1" \
         | grep -Ev '^job.*{|}' \
         | tr -d '[:cntrl:]' \
