@@ -65,6 +65,13 @@ for FUNCTION in $(grep -F 'Test: [OK]' -l -r ${WORK_DIR}/function/); do
 done
 
 # ---
+# Build pssh file hosts
+PSSH_HOSTS="./.pssh_hosts"
+
+if [ -e ${PSSH_HOSTS} ]; then
+    rm -f ${PSSH_HOSTS}
+fi
+
 for FILE in ${INCLUDE}; do
     parse ${FILE}
     for ((i=0; i<${QUEUE_DB_LENGHT}; i++)); do 

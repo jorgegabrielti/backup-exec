@@ -1,5 +1,11 @@
 # Test: [OK]
 parse () {
+    
+    # Build pssh file hosts    
+    grep -E 'USER=|HOST=' ${FILE} \
+     | cut -d'=' -f2 \
+     | sort -r | paste -s \
+     | tr -s '[:blank:]' '@' >> ${PSSH_HOSTS}
 
     # Clear queue
     if [ -e "./.queue.db" ]; then
