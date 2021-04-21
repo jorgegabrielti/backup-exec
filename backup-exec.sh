@@ -67,11 +67,11 @@ done
 # ---
 for FILE in ${INCLUDE}; do
     parse ${FILE}
-    for ((i=0; i<$(wc -l .queue.db | cut -d' ' -f1); i++)); do 
+    for ((i=0; i<${QUEUE_DB_LENGHT}; i++)); do 
         JOB[$i]=$(head -n$(($i+1)) .queue.db | tail -n1 | cut -d':' -f2)
         echo "${JOB[$i]}" > .cache
         source .cache
-        make_backup $HOST $NAME $DIR_BACKUP ${FILE[*]}
+        open_connection 
         rm -f .cache
     done
 done

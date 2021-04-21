@@ -1,6 +1,7 @@
-# Test: [OK]
+# subshell: [true]
 make_backup () {
-    ssh -T root@${HOST} <<-SCRIPT
-        tar zcvf BACKUP-${NAME}.tar.gz ${FILE[*]}
-SCRIPT
+    NAME="$1" && shift
+    FILE="$@" 
+    tar zcvf ${NAME}.tar.gz ${FILE}
 }
+make_backup $@
