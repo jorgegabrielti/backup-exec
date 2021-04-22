@@ -5,7 +5,8 @@ trapper ()
 }
 
 # Test: [OK]
-recicly () {
+recicly () 
+{
 for DIR in $(cat base_listdir.txt); do
     find ${DIR} -maxdepth 1 -type f -iname "*.bz2" -mtime +5 -exec rm -f {} \;
     find ${DIR}/logs/ -maxdepth 1 -type f -iname "*.bz2.log" -mtime +5 -exec rm -f {} \;
@@ -65,4 +66,12 @@ aws_assume_role () {
    export AWS_SESSION_TOKEN=$(grep -E 'SessionToken' /tmp/.appsMakerAssumeRole.tmp | awk '{print $2}' | tr -d '"|,')
 }
 
-echo "Testando backup-agent.sh no host: [$HOSTNAME] $1" > /tmp/log.log
+# Load global config
+source "$1"
+
+for ((c=0; c <$(wc -l ${2} | cut -d' ' -f1); c++)); do
+    JOB[$c]=$(head -n$(($c+1)) "$2" | tail -n1 | cut -d':' -f2)
+    echo ${JOB[$c]} > .job
+    source .job
+    make_backup ${NAME} ${FILE[*]}
+done

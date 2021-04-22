@@ -31,6 +31,5 @@ parse () {
         echo "$j:${JOB_CONFIG[$j]}" >> ${FILE}.db
         let "j=j+1"
     done
-    #QUEUE_DB_LENGHT=$(wc -l .queue.db | cut -d' ' -f1)
 }
 

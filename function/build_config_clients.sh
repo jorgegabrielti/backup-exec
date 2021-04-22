@@ -1,6 +1,10 @@
 # Test: [OK]
 build_config_clients () {
     
+    # Global config
+    GLOBAL_CONFIG="conf/include/backup.conf.db"
+    grep -Ev '^$|^#' conf/backup.conf | grep -vi include > ${GLOBAL_CONFIG}
+
     # Build pssh file hosts
     PSSH_HOSTS="./.pssh_hosts"
 
@@ -11,7 +15,16 @@ build_config_clients () {
             | sort -r | paste -s \
             | tr -s '[:blank:]' '@') 
             echo ${CLIENT}>> ${PSSH_HOSTS}
-        done    
+        done
+    else 
+        rm -f ${PSSH_HOSTS}
+        for FILE in ${WORK_DIR}/conf/include/*.conf; do
+            CLIENT=$(grep -E 'USER=|HOST=' ${FILE} \
+            | cut -d'=' -f2 \
+            | sort -r | paste -s \
+            | tr -s '[:blank:]' '@') 
+            echo ${CLIENT}>> ${PSSH_HOSTS}
+        done
     fi
     
     # Build pssh file hosts
@@ -21,7 +34,8 @@ build_config_clients () {
         | sort -r | paste -s \
         | tr -s '[:blank:]' '@')
         parse ${FILE}
-        scp backup-agent.sh ${FILE}.db ${CLIENT}:/tmp/
-        rm -f ${FILE}.db
+        scp backup-agent.sh ${GLOBAL_CONFIG} ${FILE}.db ${CLIENT}:/tmp/
+        rm -f ${FILE}.db 
     done
+    rm -f ${GLOBAL_CONFIG}
 }

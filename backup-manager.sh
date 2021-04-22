@@ -54,7 +54,7 @@ shopt -s expand_aliases
 DATE_TODAY=$(date +%d-%m-%Y)
 
 ### Import configs
-WORK_DIR='/vagrant_data'
+WORK_DIR="${PWD}"
 sed -i 's/\r$//' ${WORK_DIR}/conf/backup.conf
 source ${WORK_DIR}/conf/backup.conf
 
@@ -69,13 +69,3 @@ build_config_clients
 
 # Apply backup-agent execution
 backup_agent_apply
-
-#for FILE in ${INCLUDE}; do
-#    parse ${FILE}
-#    for ((i=0; i<${QUEUE_DB_LENGHT}; i++)); do 
-#        JOB[$i]=$(head -n$(($i+1)) .queue.db | tail -n1 | cut -d':' -f2)
-#        echo "${JOB[$i]}" > .cache
-#        
-#    done
-#done
-
