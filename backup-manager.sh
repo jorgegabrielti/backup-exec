@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 #
 # ##########################################################################
 # +----------------------------------------------------------------------+ #
@@ -64,22 +64,18 @@ for FUNCTION in $(grep -F 'Test: [OK]' -l -r ${WORK_DIR}/function/); do
     source ${FUNCTION}
 done
 
-# ---
-# Build pssh file hosts
-PSSH_HOSTS="./.pssh_hosts"
+# Build list clients configurations
+build_config_clients
 
-if [ -e ${PSSH_HOSTS} ]; then
-    rm -f ${PSSH_HOSTS}
-fi
+# Apply backup-agent execution
+backup_agent_apply
 
-for FILE in ${INCLUDE}; do
-    parse ${FILE}
-    for ((i=0; i<${QUEUE_DB_LENGHT}; i++)); do 
-        JOB[$i]=$(head -n$(($i+1)) .queue.db | tail -n1 | cut -d':' -f2)
-        echo "${JOB[$i]}" > .cache
-        source .cache
-        open_connection 
-        rm -f .cache
-    done
-done
+#for FILE in ${INCLUDE}; do
+#    parse ${FILE}
+#    for ((i=0; i<${QUEUE_DB_LENGHT}; i++)); do 
+#        JOB[$i]=$(head -n$(($i+1)) .queue.db | tail -n1 | cut -d':' -f2)
+#        echo "${JOB[$i]}" > .cache
+#        
+#    done
+#done
 

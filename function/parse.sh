@@ -1,24 +1,22 @@
 # Test: [OK]
 parse () {
-    
-    # Build pssh file hosts    
-    grep -E 'USER=|HOST=' ${FILE} \
-     | cut -d'=' -f2 \
-     | sort -r | paste -s \
-     | tr -s '[:blank:]' '@' >> ${PSSH_HOSTS}
 
-    # Clear queue
-    if [ -e "./.queue.db" ]; then
-        rm -f ./.queue.db
+    # Client config db
+    if [ -e "${FILE}.db" ]; then
+        rm -f ${FILE}.db
     fi
+    
+    # Remove caracteres imcompatible with Linux Systems
+    sed -i 's/\r$//' ${FILE}
 
-    sed -i 's/\r$//' "$1"
     # Identified directives 'job {}'
-    export JOB_NUMBERS=$(echo "$(grep -Enc '^job.*{|}' "$1")/2" | bc) 
+    export JOB_NUMBERS=$(echo "$(grep -Enc '^job.*{|}' "${FILE}")/2" | bc) 
 
     # Get job configuration
     j=0
     for ((i=2; i<=$((${JOB_NUMBERS}*2)); i=i+2)); do 
+
+        # Extracting the intervals 'job {}'
         INTERVAL[$j]=$(grep -En '^job.*{|}' "$1" \
         | head -n$i \
         | tail -n2 \
@@ -30,9 +28,9 @@ parse () {
         | grep -Ev '^job.*{|}' \
         | tr -d '[:cntrl:]' \
         | tr -s '[:blank:]' ' ')
-        echo "$j:${JOB_CONFIG[$j]}" >> .queue.db
+        echo "$j:${JOB_CONFIG[$j]}" >> ${FILE}.db
         let "j=j+1"
     done
-    QUEUE_DB_LENGHT=$(wc -l .queue.db | cut -d' ' -f1)
+    #QUEUE_DB_LENGHT=$(wc -l .queue.db | cut -d' ' -f1)
 }
 
