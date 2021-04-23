@@ -5,8 +5,8 @@
 # |                 Backup Shell                                         | #
 # +----------------------------------------------------------------------+ #
 # |                                                                      | #
-# | Name          : backup-exec.sh                                       | #
-# | Function      : Backup of files and SGBD                             | #
+# | Name          : backup-manager.sh                                    | #
+# | Function      : Backup of files                                      | #
 # | Version       : 1.0                                                  | #
 # | Author        : Jorge Gabriel (Support computer analyst)             | #
 # | Email         : jorgegabriel.ti@gmail.com                            | #

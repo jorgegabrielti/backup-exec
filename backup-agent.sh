@@ -31,16 +31,9 @@ hash_checksum () {
 # Test: [OK]
 aws_s3sync () {
 
-  BACKUP=$1
-  shift
-  #if [ ${#@} -gt '2' ]; then
-  #   time for FILE in ${@}; do
-              time /usr/local/bin/aws s3 cp ${BACKUP} s3://${BUCKET}/
-  #        done
-  #elif [ ${#@} -eq '2' ]; then
-  #     time /usr/local/bin/aws s3 cp ${BACKUP} s3://${BUCKET}/
-  #fi
-
+  time for BACKUP in ${@}; do
+           time /usr/local/bin/aws s3 cp ${BACKUP} s3://${BUCKET}/
+       done
 }
 
 # Test: [OK]
@@ -86,7 +79,7 @@ make_backup () {
       aws_assume_role
 
       # AWS S3 Sync
-      aws_s3sync /tmp/${NAME}.tar.gz
+      aws_s3sync /tmp/${NAME}.tar.gz /tmp/${NAME}.tar.gz.${CHECKSUM_TYPE}
   done
 }
 make_backup ${JOB[*]}
