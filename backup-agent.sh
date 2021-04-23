@@ -1,16 +1,14 @@
 # Test: [OK]
-trapper ()
-{
+trapper () {
   /usr/bin/zabbix_sender -z "$1" -p "$2" -s "$3" -k "$4" -o "$5"
 }
 
 # Test: [OK]
-recicly () 
-{
-for DIR in $(cat base_listdir.txt); do
-    find ${DIR} -maxdepth 1 -type f -iname "*.bz2" -mtime +5 -exec rm -f {} \;
-    find ${DIR}/logs/ -maxdepth 1 -type f -iname "*.bz2.log" -mtime +5 -exec rm -f {} \;
-done
+recicly () {
+  for DIR in $(cat base_listdir.txt); do
+      find ${DIR} -maxdepth 1 -type f -iname "*.bz2" -mtime +5 -exec rm -f {} \;
+      find ${DIR}/logs/ -maxdepth 1 -type f -iname "*.bz2.log" -mtime +5 -exec rm -f {} \;
+  done
 }
 
 # Test: [OK]
@@ -30,7 +28,6 @@ hash_checksum () {
 
 # Test: [OK]
 aws_s3sync () {
-
   time for BACKUP in ${@}; do
            time /usr/local/bin/aws s3 cp ${BACKUP} s3://${BUCKET}/
        done
@@ -54,32 +51,38 @@ aws_assume_role () {
 process_file () {
 
   source "$1"
-
   for ((c=0; c <$(wc -l ${2} | cut -d' ' -f1); c++)); do
       JOB_DEF[$c]=$(head -n$(($c+1)) "$2" | tail -n1 | cut -d':' -f2)
-      echo ${JOB_DEF[$c]} > .job_def_${c}
-      JOB[$c]=".job_def_${c}"
+      echo ${JOB_DEF[$c]} > /tmp/.job_def_${c}
+      JOB[$c]="/tmp/.job_def_${c}"
   done
 
 }
 process_file $@
 
-# Make backup compress
+# Execute task backup
 make_backup () {
+
   for TASK in "$@"; do
+    
       source ${TASK}
-      tar zcvf /tmp/${NAME}.tar.gz ${FILE[*]}
+    
+      if [ ! -d ${STORAGE} ]; then
+         mkdir ${STORAGE}
+      fi 
+    
+      tar zcvf ${STORAGE}/${NAME}.tar.gz ${FILE[*]}
       
       ### Call functions
       
       # Checksum
-      hash_checksum /tmp/${NAME}.tar.gz
+      hash_checksum ${STORAGE}/${NAME}.tar.gz
       
       # AWS Assume Role
       aws_assume_role
 
       # AWS S3 Sync
-      aws_s3sync /tmp/${NAME}.tar.gz /tmp/${NAME}.tar.gz.${CHECKSUM_TYPE}
+      aws_s3sync /${STORAGE}/${NAME}.tar.gz ${STORAGE}/${NAME}.tar.gz.${CHECKSUM_TYPE}
   done
 }
 make_backup ${JOB[*]}
