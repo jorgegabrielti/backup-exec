@@ -21,14 +21,6 @@ postgresql_dump () {
 
 }
 
-# subshell: [true]
-make_backup () {
-    NAME="$1" && shift
-    FILE="$@" 
-    tar zcvf ${NAME}.tar.gz ${FILE} 
-}
-#make_backup $@
-
 # Test: [OK]
 hash_checksum () {
 
@@ -66,12 +58,25 @@ aws_assume_role () {
    export AWS_SESSION_TOKEN=$(grep -E 'SessionToken' /tmp/.appsMakerAssumeRole.tmp | awk '{print $2}' | tr -d '"|,')
 }
 
-# Load global config
-source "$1"
+# Load global config and process job file
+process_file () {
 
-for ((c=0; c <$(wc -l ${2} | cut -d' ' -f1); c++)); do
-    JOB[$c]=$(head -n$(($c+1)) "$2" | tail -n1 | cut -d':' -f2)
-    echo ${JOB[$c]} > .job
-    source .job
-    make_backup ${NAME} ${FILE[*]}
-done
+  source "$1"
+
+  for ((c=0; c <$(wc -l ${2} | cut -d' ' -f1); c++)); do
+      JOB_DEF[$c]=$(head -n$(($c+1)) "$2" | tail -n1 | cut -d':' -f2)
+      echo ${JOB_DEF[$c]} > .job_def_${c}
+      JOB[$c]=".job_def_${c}"
+  done
+
+}
+process_file $@
+
+# Make backup compress
+make_backup () {
+  for TASK in "$@"; do
+      source ${TASK}
+      tar zcvf /tmp/${NAME}.tar.gz ${FILE[*]}
+  done
+}
+make_backup ${JOB[*]}
