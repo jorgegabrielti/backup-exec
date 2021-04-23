@@ -24,23 +24,22 @@ postgresql_dump () {
 # Test: [OK]
 hash_checksum () {
 
-  ${CHECKSUM_TYPE}sum "$1"
+  ${CHECKSUM_TYPE}sum "$1" > "$1".${CHECKSUM_TYPE}
 
 }
 
 # Test: [OK]
 aws_s3sync () {
 
-  BASE=$1
+  BACKUP=$1
   shift
-  if [ ${#@} -gt '2' ]; then
-     time for FILE in ${@}; do
-              time /usr/local/bin/aws s3 cp ${FILE} s3://${BUCKET}/postgres/${BASE}/$(date +%d-%m-%Y)/
-          done
-  elif [ ${#@} -eq '2' ]; then
-       time /usr/local/bin/aws s3 cp "$1" s3://${BUCKET}/postgres/${BASE}/
-       time /usr/local/bin/aws s3 cp "$2" s3://${BUCKET}/postgres/${BASE}/logs/
-  fi
+  #if [ ${#@} -gt '2' ]; then
+  #   time for FILE in ${@}; do
+              time /usr/local/bin/aws s3 cp ${BACKUP} s3://${BUCKET}/
+  #        done
+  #elif [ ${#@} -eq '2' ]; then
+  #     time /usr/local/bin/aws s3 cp ${BACKUP} s3://${BUCKET}/
+  #fi
 
 }
 
@@ -50,12 +49,12 @@ aws_assume_role () {
    unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
 
    # User assume role
-   /usr/local/bin/aws sts assume-role --role-arn ${ARN_ROLE} --role-session-name appsMakerAssumeRole > /tmp/.appsMakerAssumeRole.tmp
+   /usr/local/bin/aws sts assume-role --role-arn ${ARN_ROLE} --role-session-name appsMakerAssumeRole > /tmp/.assumeRole.tmp
 
    # Get secrets
-   export AWS_ACCESS_KEY_ID=$(grep -E 'AccessKeyId' /tmp/.appsMakerAssumeRole.tmp | awk '{print $2}' | tr -d '"|,')
-   export AWS_SECRET_ACCESS_KEY=$(grep -E 'SecretAccessKey' /tmp/.appsMakerAssumeRole.tmp | awk '{print $2}' | tr -d '"|,')
-   export AWS_SESSION_TOKEN=$(grep -E 'SessionToken' /tmp/.appsMakerAssumeRole.tmp | awk '{print $2}' | tr -d '"|,')
+   export AWS_ACCESS_KEY_ID=$(grep -E 'AccessKeyId' /tmp/.assumeRole.tmp | awk '{print $2}' | tr -d '"|,')
+   export AWS_SECRET_ACCESS_KEY=$(grep -E 'SecretAccessKey' /tmp/.assumeRole.tmp | awk '{print $2}' | tr -d '"|,')
+   export AWS_SESSION_TOKEN=$(grep -E 'SessionToken' /tmp/.assumeRole.tmp | awk '{print $2}' | tr -d '"|,')
 }
 
 # Load global config and process job file
@@ -77,6 +76,17 @@ make_backup () {
   for TASK in "$@"; do
       source ${TASK}
       tar zcvf /tmp/${NAME}.tar.gz ${FILE[*]}
+      
+      ### Call functions
+      
+      # Checksum
+      hash_checksum /tmp/${NAME}.tar.gz
+      
+      # AWS Assume Role
+      aws_assume_role
+
+      # AWS S3 Sync
+      aws_s3sync /tmp/${NAME}.tar.gz
   done
 }
 make_backup ${JOB[*]}
