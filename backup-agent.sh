@@ -1,3 +1,5 @@
+DATE_TODAY=$(date +%d-%m-%Y)
+
 # Test: [OK]
 trapper () {
   /usr/bin/zabbix_sender -z "$1" -p "$2" -s "$3" -k "$4" -o "$5"
@@ -48,7 +50,8 @@ aws_assume_role () {
 }
 
 ### Build a regular file
-regular_file_backup () {
+regular_file_backup ()
+{
   # Storage directory
   if [ ! -d ${STORAGE} ]; then
        mkdir ${STORAGE}
@@ -68,24 +71,28 @@ regular_file_backup () {
 }
 
 ### Build MySQL Backup with mysqldump
-sgbd_mysql_backup () {
-  # Storage directory
-  STORAGE="${STORAGE}/mysql"
-  if [ ! -d ${STORAGE} ]; then
-       mkdir ${STORAGE}
-  fi
+sgbd_mysql_backup ()
+{
+  
+  for BASE in ${DATABASE[*]}; do
 
-  for BASE in ${DATABASE}; do
+      # Storage directory
+      if [ ! -d ${STORAGE} ]; then
+        mkdir -p ${STORAGE}/${TYPE}/${BASE}/${NAME}/logs
+      else
+        mkdir -p ${STORAGE}/${TYPE}/${BASE}/${NAME}/logs
+      fi
+
       # Last binary log
       LOG_BIN_BEFORE_BACKUP=$(mysql -e "SHOW BINARY LOGS" | tail -n1 | awk '{print $1}')
 
       SALT=$(date +%d%m%Y%M%S%s%N | md5sum | awk '{print $1}')
       SALT=${SALT:24}
-
+      
       # Make backup logical
       mysqldump --databases ${BASE} --single-transaction -F \
-      --result-file=${STORAGE}/${BASE}/${BASE}-${DATE_TODAY}-${SALT}.sql \
-      --log-error=${STORAGE}/${BASE}/logs/${BASE}-${DATE_TODAY}-error-${SALT}.log \
+      --result-file=${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql \
+      --log-error=${STORAGE}/${TYPE}/${BASE}/${NAME}/logs/${BASE}-${DATE_TODAY}-error-${SALT}.log \
       --compression-algorithms=zlib \
       --dump-date
 
@@ -96,27 +103,29 @@ sgbd_mysql_backup () {
 
       LOG_BIN_AFTER_BACKUP=$(mysql -e "SHOW BINARY LOGS" | tail -n1 | awk '{print $1}')
 
-cat > ${STORAGE}/${BASE}/logs/${BASE}-binlog-${SALT}.log << LOGFILE
-# Logbin before backup
-/var/lib/mysql/${LOG_BIN_BEFORE_BACKUP}
+      cat > ${STORAGE}/${TYPE}/${BASE}/${NAME}/logs/${BASE}-binlog-${SALT}.log <<-LOGFILE
+            # Logbin before backup
+            /var/lib/mysql/${LOG_BIN_BEFORE_BACKUP}
 
-# Order to restore the backup:
-1º ==> ${BASE}-${DATE_TODAY}-${SALT}.sql
-2º ==> ${LOG_BIN_DURING_BACKUP}
-3º ==> ${LOG_BIN_AFTER_BACKUP}
+            # Order to restore the backup:
+            1º ==> ${BASE}-${DATE_TODAY}-${SALT}.sql
+            2º ==> ${LOG_BIN_DURING_BACKUP}
+            3º ==> ${LOG_BIN_AFTER_BACKUP}
 
-# ****** NOTE *******
-In case this is the last backup prior to a point of failure, it must be followed by all binary logs after it to the point of failure
+            # ****** NOTE *******
+            In case this is the last backup prior to a point of failure, it must be followed by all binary logs after it to the point of failure
 
-# Procedure
-mysql -e "source ${STORAGE}/${BASE}/${DATABASE_NAME}-${DATE_TODAY}-${SALT}.sql"
-mysqlbinlog /var/lib/mysql/${LOG_BIN_DURING_BACKUP} > ${LOG_BIN_DURING_BACKUP}.sql && mysql -f < ${LOG_BIN_DURING_BACKUP}.sql
-mysqlbinlog /var/lib/mysql/${LOG_BIN_AFTER_BACKUP} > ${LOG_BIN_AFTER_BACKUP}.sql && mysql < ${LOG_BIN_AFTER_BACKUP}.sql
+            # Procedure
+            mysql -e "source ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql"
+            mysqlbinlog /var/lib/mysql/${LOG_BIN_DURING_BACKUP} > ${LOG_BIN_DURING_BACKUP}.sql && mysql -f < ${LOG_BIN_DURING_BACKUP}.sql
+            mysqlbinlog /var/lib/mysql/${LOG_BIN_AFTER_BACKUP} > ${LOG_BIN_AFTER_BACKUP}.sql && mysql < ${LOG_BIN_AFTER_BACKUP}.sql
 LOGFILE
+  done
 }
 
 # Load global config and process job file
-process_file () {
+process_file ()
+{
   source "$1"
   for ((c=0; c <$(wc -l ${2} | cut -d' ' -f1); c++)); do
       JOB_DEF[$c]=$(head -n$(($c+1)) "$2" | tail -n1 | cut -d':' -f2)
@@ -127,7 +136,8 @@ process_file () {
 process_file $@
 
 # Execute task backup
-make_backup () {
+make_backup ()
+{
   for TASK in "$@"; do
       source ${TASK}
       # Validation type of backup
