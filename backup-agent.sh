@@ -19,14 +19,6 @@ recicly () {
 }
 
 # Test: [OK]
-postgresql_dump () {
-
-    /usr/bin/pg_dump -U ${USER_POSTGRESQL} ${DATABASE} | \
-    ${COMPRESS_ALG} -c > ${STORAGE}/${BASE,,}/${BASE,,}-${DATE_TODAY}.sql.bz2
-
-}
-
-# Test: [OK]
 hash_checksum () {
 
   ${CHECKSUM_TYPE}sum "$1" > "$1".${CHECKSUM_TYPE}
