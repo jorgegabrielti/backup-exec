@@ -127,7 +127,6 @@ LOGFILE
 sgbd_postgres_backup ()
 {
   for BASE in ${DATABASE[*]}; do
-
       # Storage directory
       if [ ! -d ${STORAGE} ]; then
         mkdir -p ${STORAGE}/${TYPE}/${BASE}/${NAME}/logs
@@ -135,9 +134,12 @@ sgbd_postgres_backup ()
         mkdir -p ${STORAGE}/${TYPE}/${BASE}/${NAME}/logs
       fi
 
-      /usr/bin/pg_dump -U ${USER_POSTGRESQL} ${DATABASE} | \
-      ${COMPRESS_ALG} -c > ${STORAGE}/${TYPE}/${NAME}/${BASE,,}/${BASE,,}-${DATE_TODAY}.sql.bz2
+      # Apply permission to user ${USER_POSTGRES} to write
+      chown ${USER_POSTGRESQL}. ${STORAGE}/${TYPE}/${BASE}/${NAME}/ -R
 
+      su -c "/usr/bin/pg_dump ${BASE} | ${COMPRESS_ALG} -c \
+      > ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2" \
+      -l ${USER_POSTGRESQL}
   done
 }
 
