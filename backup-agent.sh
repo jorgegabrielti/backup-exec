@@ -1,3 +1,8 @@
+### TODO:
+# Make a function to compress with diferents compressors of data.
+# this function should validate the variable COMPRESS_ALG and
+# then apply the correct compressor
+
 DATE_TODAY=$(date +%d-%m-%Y)
 
 # Test: [OK]
@@ -7,9 +12,9 @@ trapper () {
 
 # Test: [OK]
 recicly () {
-  for DIR in $(cat base_listdir.txt); do
-      find ${DIR} -maxdepth 1 -type f -iname "*.bz2" -mtime +5 -exec rm -f {} \;
-      find ${DIR}/logs/ -maxdepth 1 -type f -iname "*.bz2.log" -mtime +5 -exec rm -f {} \;
+  for DIR in $1; do
+      find ${DIR} -maxdepth 1 -type f -mtime +5 -exec rm -f {} \;
+      find ${DIR}/logs/ -maxdepth 1 -type f -mtime +5 -exec rm -f {} \;
   done
 }
 
@@ -31,7 +36,7 @@ hash_checksum () {
 # Test: [OK]
 aws_s3sync () {
   time for BACKUP in ${@}; do
-           time /usr/local/bin/aws s3 cp ${BACKUP} s3://${BUCKET}/
+           time /usr/local/bin/aws s3 cp ${BACKUP} s3://${BUCKET}/${NAME}/
        done
 }
 
@@ -54,20 +59,30 @@ regular_file_backup ()
 {
   # Storage directory
   if [ ! -d ${STORAGE} ]; then
-       mkdir ${STORAGE}
-  fi 
+      mkdir -p ${STORAGE}/${TYPE}/${NAME}/logs
+  else
+      mkdir -p ${STORAGE}/${TYPE}/${NAME}/logs
+  fi
     
-  tar zcvf ${STORAGE}/${NAME}.tar.gz ${FILE[*]}
+  tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz ${FILE[*]}
      
   ### Call functions 
   # Checksum
-  hash_checksum ${STORAGE}/${NAME}.tar.gz   
+  hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz  
   
-  # AWS Assume Role
-  #aws_assume_role
+  ### Copy to AWS S3
+  if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
+  
+    # AWS Assume Role 
+    aws_assume_role
 
-  # AWS S3 Sync
-  #aws_s3sync /${STORAGE}/${NAME}.tar.gz ${STORAGE}/${NAME}.tar.gz.${CHECKSUM_TYPE}
+    # AWS S3 Sync
+    aws_s3sync ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz \
+               ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz.${CHECKSUM_TYPE}
+  fi 
+
+  # Recicly
+  recicly ${STORAGE}/${TYPE}/${NAME}
 }
 
 ### Build MySQL Backup with mysqldump
@@ -120,6 +135,24 @@ sgbd_mysql_backup ()
             mysqlbinlog /var/lib/mysql/${LOG_BIN_DURING_BACKUP} > ${LOG_BIN_DURING_BACKUP}.sql && mysql -f < ${LOG_BIN_DURING_BACKUP}.sql
             mysqlbinlog /var/lib/mysql/${LOG_BIN_AFTER_BACKUP} > ${LOG_BIN_AFTER_BACKUP}.sql && mysql < ${LOG_BIN_AFTER_BACKUP}.sql
 LOGFILE
+     
+     # Compress
+     tar jcvf ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG} \
+     ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql \
+     ${STORAGE}/${TYPE}/${BASE}/${NAME}/logs/${BASE}-binlog-${SALT}.log
+
+
+     # Checksum
+     hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}
+
+    if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
+      # AWS Assume Role 
+      aws_assume_role
+
+      # AWS S3 Sync
+      aws_s3sync ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG} \
+      ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}.${CHECKSUM_TYPE}
+    fi
   done
 }
 
@@ -140,6 +173,18 @@ sgbd_postgres_backup ()
       su -c "/usr/bin/pg_dump ${BASE} | ${COMPRESS_ALG} -c \
       > ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2" \
       -l ${USER_POSTGRESQL}
+      
+      # Checksum
+      hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2
+      
+      if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
+          # AWS Assume Role 
+          aws_assume_role
+
+          # AWS S3 Sync
+          aws_s3sync ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 \
+          ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE}
+      fi
   done
 }
 
