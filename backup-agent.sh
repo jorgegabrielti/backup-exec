@@ -16,8 +16,8 @@ recicly () {
 # Test: [OK]
 postgresql_dump () {
 
-    /usr/bin/pg_dump -U ${USER_POSTGRESQL} "$1" | \
-    ${COMPRESS_ALG} -c > ${DIR_BACKUP}/${BASE,,}/${BASE,,}-${DATE_TODAY}.sql.bz2
+    /usr/bin/pg_dump -U ${USER_POSTGRESQL} ${DATABASE} | \
+    ${COMPRESS_ALG} -c > ${STORAGE}/${BASE,,}/${BASE,,}-${DATE_TODAY}.sql.bz2
 
 }
 
@@ -123,6 +123,25 @@ LOGFILE
   done
 }
 
+### Build PostgreSQL Backup with pg_dump
+sgbd_postgres_backup ()
+{
+  for BASE in ${DATABASE[*]}; do
+
+      # Storage directory
+      if [ ! -d ${STORAGE} ]; then
+        mkdir -p ${STORAGE}/${TYPE}/${BASE}/${NAME}/logs
+      else
+        mkdir -p ${STORAGE}/${TYPE}/${BASE}/${NAME}/logs
+      fi
+
+      /usr/bin/pg_dump -U ${USER_POSTGRESQL} ${DATABASE} | \
+      ${COMPRESS_ALG} -c > ${STORAGE}/${TYPE}/${NAME}/${BASE,,}/${BASE,,}-${DATE_TODAY}.sql.bz2
+
+  done
+}
+
+
 # Load global config and process job file
 process_file ()
 {
@@ -143,13 +162,13 @@ make_backup ()
       # Validation type of backup
       case ${TYPE} in 
            "default"|"regular_file")
-              regular_file_backup
+             regular_file_backup
            ;;
            "mysql")
-              sgbd_mysql_backup
+             sgbd_mysql_backup
            ;;
            "postgres")
-              sgbd_postgres_backup
+             sgbd_postgres_backup
            ;;
            *)
              echo "[ERROR]: TYPE is not definied in JOB => ${NAME}!"
