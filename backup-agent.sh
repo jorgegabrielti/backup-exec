@@ -56,7 +56,7 @@ regular_file_backup ()
       mkdir -p ${STORAGE}/${TYPE}/${NAME}/logs
   fi
     
-  tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz ${FILE[*]}
+  tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz ${FILE[*]}
 
   BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz | awk '{print $1}')
 
@@ -64,12 +64,12 @@ regular_file_backup ()
   if [ "${BACKUP_SIZE}" -ge '1073741824' ]; then
       mkdir ${STORAGE}/${TYPE}/${NAME}/fragments
       # Fragments the backup into files smaller than 512MB each
-      split -b 512M -d ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz \
-      ${STORAGE}/${TYPE}/${NAME}/fragment/${NAME}.tar.gz_
+      split -b 512M -d ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
+      ${STORAGE}/${TYPE}/${NAME}/fragments/${NAME}-${DATE_TODAY}.tar.gz_
      
       ### Call functions 
-      # Checksum
-      hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz  
+      # Checksum # TODO => work with fragments
+      #hash_checksum ${STORAGE}/${TYPE}/${NAME}/fragments/${NAME}-${DATE_TODAY}.tar.gz_* 
   
       ### Copy to AWS S3
       if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
@@ -77,13 +77,13 @@ regular_file_backup ()
          aws_assume_role
 
          # AWS S3 Sync
-         aws_s3sync ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz \
-         ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz.${CHECKSUM_TYPE}
+         aws_s3sync ${STORAGE}/${TYPE}/${NAME}/fragments/${NAME}-${DATE_TODAY}.tar.gz_ #\
+         #${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz.${CHECKSUM_TYPE}
       fi
   else 
       ### Call functions 
       # Checksum
-      hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz  
+      hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}${DATE_TODAY}.tar.gz  
   
       ### Copy to AWS S3
       if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
@@ -91,8 +91,8 @@ regular_file_backup ()
           aws_assume_role
 
           # AWS S3 Sync
-          aws_s3sync ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz \
-          ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz.${CHECKSUM_TYPE}
+          aws_s3sync ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
+          ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz.${CHECKSUM_TYPE}
       fi
   fi
   # Recicly
