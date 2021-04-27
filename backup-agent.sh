@@ -20,9 +20,10 @@ recicly () {
 
 # Test: [OK]
 hash_checksum () {
-
-  ${CHECKSUM_TYPE}sum "$1" > "$1".${CHECKSUM_TYPE}
-
+  if [ "$@" -gt 1 ]; then
+    for FRAGMENT in "$@"; do
+      ${CHECKSUM_TYPE}sum ${FRAGMENT} >> "$1".${CHECKSUM_TYPE}  
+    done
 }
 
 # Test: [OK]
@@ -65,11 +66,11 @@ regular_file_backup ()
       mkdir ${STORAGE}/${TYPE}/${NAME}/fragments
       # Fragments the backup into files smaller than 512MB each
       split -b 512M -d ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
-      ${STORAGE}/${TYPE}/${NAME}/fragments/${NAME}-${DATE_TODAY}.tar.gz_
+      ${STORAGE}/${TYPE}/${NAME}/fragments/${NAME}-${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_
      
       ### Call functions 
       # Checksum # TODO => work with fragments
-      #hash_checksum ${STORAGE}/${TYPE}/${NAME}/fragments/${NAME}-${DATE_TODAY}.tar.gz_* 
+      hash_checksum ${STORAGE}/${TYPE}/${NAME}/fragments/${NAME}-${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_* 
   
       ### Copy to AWS S3
       if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
@@ -77,7 +78,7 @@ regular_file_backup ()
          aws_assume_role
 
          # AWS S3 Sync
-         aws_s3sync ${STORAGE}/${TYPE}/${NAME}/fragments/${NAME}-${DATE_TODAY}.tar.gz_ #\
+         aws_s3sync ${STORAGE}/${TYPE}/${NAME}/fragments/${NAME}-${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_* #\
          #${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz.${CHECKSUM_TYPE}
       fi
   else 
