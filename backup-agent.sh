@@ -58,7 +58,7 @@ regular_file_backup ()
     
   tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz ${FILE[*]}
 
-  BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz | awk '{print $1}')
+  BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz | awk '{print $1}')
 
   # Threshold 1GiB
   if [ "${BACKUP_SIZE}" -ge '1073741824' ]; then
