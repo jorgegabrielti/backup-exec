@@ -57,22 +57,44 @@ regular_file_backup ()
   fi
     
   tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz ${FILE[*]}
+
+  BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz | awk '{print $1}')
+
+  # Threshold 1GiB
+  if [ "${BACKUP_SIZE}" -ge '1073741824' ]; then
+      mkdir ${STORAGE}/${TYPE}/${NAME}/fragments
+      # Fragments the backup into files smaller than 512MB each
+      split -b 512M -d ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz \
+      ${STORAGE}/${TYPE}/${NAME}/fragment/${NAME}.tar.gz_
      
-  ### Call functions 
-  # Checksum
-  hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz  
+      ### Call functions 
+      # Checksum
+      hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz  
   
-  ### Copy to AWS S3
-  if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
+      ### Copy to AWS S3
+      if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
+         # AWS Assume Role 
+         aws_assume_role
+
+         # AWS S3 Sync
+         aws_s3sync ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz \
+         ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz.${CHECKSUM_TYPE}
+      fi
+  else 
+      ### Call functions 
+      # Checksum
+      hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz  
   
-    # AWS Assume Role 
-    aws_assume_role
+      ### Copy to AWS S3
+      if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
+          # AWS Assume Role 
+          aws_assume_role
 
-    # AWS S3 Sync
-    aws_s3sync ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz \
-               ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz.${CHECKSUM_TYPE}
-  fi 
-
+          # AWS S3 Sync
+          aws_s3sync ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz \
+          ${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz.${CHECKSUM_TYPE}
+      fi
+  fi
   # Recicly
   recicly ${STORAGE}/${TYPE}/${NAME}
 }
@@ -128,19 +150,19 @@ sgbd_mysql_backup ()
             mysqlbinlog /var/lib/mysql/${LOG_BIN_AFTER_BACKUP} > ${LOG_BIN_AFTER_BACKUP}.sql && mysql < ${LOG_BIN_AFTER_BACKUP}.sql
 LOGFILE
      
-     # Compress
-     tar jcvf ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG} \
-     ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql \
-     ${STORAGE}/${TYPE}/${BASE}/${NAME}/logs/${BASE}-binlog-${SALT}.log
+    # Compress
+    tar jcvf ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG} \
+    ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql \
+    ${STORAGE}/${TYPE}/${BASE}/${NAME}/logs/${BASE}-binlog-${SALT}.log
 
     BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG} | awk '{print $1}')
 
     # Threshold 1GiB
     if [ "${BACKUP_SIZE}" -ge '1073741824' ]; then
-       mkdir ${DIR_BACKUP}/${BASE}/fragments
+       mkdir ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments
        # Fragments the backup into files smaller than 512MB each
        split -b 512M -d ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG} \
-       ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}_
+       ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}_
 
       # Checksum
       hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}
