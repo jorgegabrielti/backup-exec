@@ -133,18 +133,40 @@ LOGFILE
      ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql \
      ${STORAGE}/${TYPE}/${BASE}/${NAME}/logs/${BASE}-binlog-${SALT}.log
 
+    BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG} | awk '{print $1}')
 
-     # Checksum
-     hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}
+    # Threshold 1GiB
+    if [ "${BACKUP_SIZE}" -ge '1073741824' ]; then
+       mkdir ${DIR_BACKUP}/${BASE}/fragments
+       # Fragments the backup into files smaller than 512MB each
+       split -b 512M -d ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG} \
+       ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}_
 
-    if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
-      # AWS Assume Role 
-      aws_assume_role
+      # Checksum
+      hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}
 
-      # AWS S3 Sync
-      aws_s3sync ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG} \
-      ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}.${CHECKSUM_TYPE}
-    fi
+      if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
+        # AWS Assume Role 
+        aws_assume_role
+
+        # AWS S3 Sync
+        aws_s3sync ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG} \
+        ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}.${CHECKSUM_TYPE}
+      fi
+    else
+      # Checksum
+      hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}
+
+      if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
+        # AWS Assume Role 
+        aws_assume_role
+
+        # AWS S3 Sync
+        aws_s3sync ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG} \
+        ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}.${CHECKSUM_TYPE}
+      fi
+    fi 
+    
   done
 }
 
