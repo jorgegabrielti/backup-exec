@@ -13,24 +13,35 @@ trapper () {
 # Test: [OK]
 recicly () {
   for DIR in $1; do
-      find ${DIR} -maxdepth 1 -type f -mtime +5 -exec rm -f {} \;
-      find ${DIR}/logs/ -maxdepth 1 -type f -mtime +5 -exec rm -f {} \;
+      find ${DIR}/ -maxdepth 1 -type f -iname "${NAME}*" -mtime +${RETENTION} -exec rm -f {} \;
+      find ${DIR}/logs/ -maxdepth 1 -type f -iname "${NAME}*" -mtime +${RETENTION} -exec rm -f {} \;
   done
 }
 
 # Test: [OK]
 hash_checksum () {
-  if [ "$@" -gt 1 ]; then
+  if [ "${#@}" -gt 1 ]; then
+    ${CHECKSUM_TYPE}sum $1 > "$1".${CHECKSUM_TYPE}
+    shift
     for FRAGMENT in "$@"; do
-      ${CHECKSUM_TYPE}sum ${FRAGMENT} >> "$1".${CHECKSUM_TYPE}  
+      ${CHECKSUM_TYPE}sum ${FRAGMENT} >> "${1/%_00/}".${CHECKSUM_TYPE}
     done
+  else
+    ${CHECKSUM_TYPE}sum $1 > "$1".${CHECKSUM_TYPE}
+  fi
 }
 
 # Test: [OK]
 aws_s3sync () {
-  time for BACKUP in ${@}; do
-           time /usr/local/bin/aws s3 cp ${BACKUP} s3://${BUCKET}/${NAME}/
-       done
+  if [ "${#@}" -gt "2" ]; then
+     time for BACKUP in ${@}; do
+              time /usr/local/bin/aws s3 cp ${BACKUP} s3://${BUCKET}/${NAME}/${DATE_TODAY}/
+          done
+  else
+     time for BACKUP in ${@}; do
+              time /usr/local/bin/aws s3 cp ${BACKUP} s3://${BUCKET}/${NAME}/
+          done
+  fi
 }
 
 # Test: [OK]
@@ -56,39 +67,42 @@ regular_file_backup ()
   else
       mkdir -p ${STORAGE}/${TYPE}/${NAME}/logs
   fi
-    
+
   tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz ${FILE[*]}
 
   BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz | awk '{print $1}')
 
   # Threshold 1GiB
   if [ "${BACKUP_SIZE}" -ge '1073741824' ]; then
-      mkdir ${STORAGE}/${TYPE}/${NAME}/fragments
+      mkdir -p ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}
       # Fragments the backup into files smaller than 512MB each
-      split -b 512M -d ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
-      ${STORAGE}/${TYPE}/${NAME}/fragments/${NAME}-${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_
-     
-      ### Call functions 
+      split -b 100M -d ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
+      ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_
+      ### Call functions
       # Checksum # TODO => work with fragments
-      hash_checksum ${STORAGE}/${TYPE}/${NAME}/fragments/${NAME}-${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_* 
-  
+      hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
+      ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_*
+
       ### Copy to AWS S3
       if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
-         # AWS Assume Role 
+         # AWS Assume Role
          aws_assume_role
 
          # AWS S3 Sync
-         aws_s3sync ${STORAGE}/${TYPE}/${NAME}/fragments/${NAME}-${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_* #\
-         #${STORAGE}/${TYPE}/${NAME}/${NAME}.tar.gz.${CHECKSUM_TYPE}
+         aws_s3sync ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_* \
+         ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz.${CHECKSUM_TYPE}
+         if [ "$?" -eq "0" ]; then
+            rm -rf ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}
+         fi
       fi
-  else 
-      ### Call functions 
+  else
+      ### Call functions
       # Checksum
-      hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}${DATE_TODAY}.tar.gz  
-  
+      hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz
+
       ### Copy to AWS S3
       if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
-          # AWS Assume Role 
+          # AWS Assume Role
           aws_assume_role
 
           # AWS S3 Sync
@@ -103,7 +117,7 @@ regular_file_backup ()
 ### Build MySQL Backup with mysqldump
 sgbd_mysql_backup ()
 {
-  
+
   for BASE in ${DATABASE[*]}; do
 
       # Storage directory
@@ -118,7 +132,7 @@ sgbd_mysql_backup ()
 
       SALT=$(date +%d%m%Y%M%S%s%N | md5sum | awk '{print $1}')
       SALT=${SALT:24}
-      
+
       # Make backup logical
       mysqldump --databases ${BASE} --single-transaction -F \
       --result-file=${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql \
@@ -150,8 +164,7 @@ sgbd_mysql_backup ()
             mysqlbinlog /var/lib/mysql/${LOG_BIN_DURING_BACKUP} > ${LOG_BIN_DURING_BACKUP}.sql && mysql -f < ${LOG_BIN_DURING_BACKUP}.sql
             mysqlbinlog /var/lib/mysql/${LOG_BIN_AFTER_BACKUP} > ${LOG_BIN_AFTER_BACKUP}.sql && mysql < ${LOG_BIN_AFTER_BACKUP}.sql
 LOGFILE
-     
-    # Compress
+ # Compress
     tar jcvf ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG} \
     ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql \
     ${STORAGE}/${TYPE}/${BASE}/${NAME}/logs/${BASE}-binlog-${SALT}.log
@@ -169,7 +182,7 @@ LOGFILE
       hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}
 
       if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
-        # AWS Assume Role 
+        # AWS Assume Role
         aws_assume_role
 
         # AWS S3 Sync
@@ -181,15 +194,15 @@ LOGFILE
       hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}
 
       if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
-        # AWS Assume Role 
+        # AWS Assume Role
         aws_assume_role
 
         # AWS S3 Sync
         aws_s3sync ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG} \
         ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}-${SALT}.sql.${COMPRESS_ALG}.${CHECKSUM_TYPE}
       fi
-    fi 
-    
+    fi
+
   done
 }
 
@@ -210,12 +223,12 @@ sgbd_postgres_backup ()
       su -c "/usr/bin/pg_dump ${BASE} | ${COMPRESS_ALG} -c \
       > ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2" \
       -l ${USER_POSTGRESQL}
-      
+
       # Checksum
       hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2
-      
+
       if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
-          # AWS Assume Role 
+          # AWS Assume Role
           aws_assume_role
 
           # AWS S3 Sync
@@ -244,7 +257,7 @@ make_backup ()
   for TASK in "$@"; do
       source ${TASK}
       # Validation type of backup
-      case ${TYPE} in 
+      case ${TYPE} in
            "default"|"regular_file")
              regular_file_backup
            ;;
@@ -259,7 +272,7 @@ make_backup ()
              exit 0
            ;;
       esac
-  done 
+  done
 }
-# Input job_def file 
+# Input job_def file
 make_backup ${JOB[*]}
