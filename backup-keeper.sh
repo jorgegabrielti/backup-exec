@@ -5,7 +5,7 @@
 # |                 Backup Shell                                         | #
 # +----------------------------------------------------------------------+ #
 # |                                                                      | #
-# | Name          : backup-manager.sh                                    | #
+# | Name          : backup-keeper.sh                                     | #
 # | Function      : Backup of files                                      | #
 # | Version       : 1.0                                                  | #
 # | Author        : Jorge Gabriel (Support computer analyst)             | #
@@ -21,10 +21,10 @@
 #
 # Algortimo do script :
 #
-# For each postgres databases listed in the configuration file
-# [conf/maker_backup.conf], this programa make:
+# For each job configuration listed in the configuration file
+# [conf/include/], this programa make:
 #
-#  1º - Create the backup using the pg_dump program;
+#  1º - Create the backup;
 #
 #  2º - Caculate the backup size based in threshold and fragment
 #       it if necessary, making a hash for eac fragment;
@@ -40,11 +40,11 @@
 #
 # Historico
 #
-#     v1.0, Deploy script, [Fri Mar 26 08:40:18 2021] - Jorge Gabriel:
+#     v1.0, Deploy script, [Thuesay Apr 27 20:00:00 2021] - Jorge Gabriel:
 #
-#      - Make backup and copy to AWS S3.
-#
-#
+# TODO: 
+# - Fixe header
+# - Create comand line options
 set -e
 
 ### Alias eXpands
