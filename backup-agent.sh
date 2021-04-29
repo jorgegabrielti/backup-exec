@@ -9,9 +9,21 @@
 DATE_TODAY=$(date +%d-%m-%Y)
 
 # Test: [OK]
-trapper ()
+z_trapper ()
 {
-  /usr/bin/zabbix_sender -z "$1" -p "$2" -s "$3" -k "$4" -o "$5"
+  ### Parameters
+  # 1º: item.key variable
+  # 2º: String message
+  
+  ITEM_KEY="$1"
+  shift
+
+  /usr/bin/zabbix_sender \
+  -z ${Z_SERVER} \
+  -p ${Z_SERVER_PORT} \
+  -s ${Z_HOST} \
+  -k ${ITEM_KEY} \
+  -o "$*"
 }
 
 # Test: [OK]
@@ -87,25 +99,39 @@ regular_file_backup ()
 
   if [ ${FILE_JOB_SIZE} -ge ${STORAGE_SIZE} ]; then
     # Not run backup and send trapper to Zabbix Server
+    z_trapper ${Z_BACKUP_JOB_STATUS_KEY} \
+    "[Warning]: There are not free space in disk to make the backup. Starting recycling routine..."
     recicly ${STORAGE}/${TYPE}/${NAME}
     if [ ${FILE_JOB_SIZE} -ge ${STORAGE_SIZE} ]; then
-      # TODO: Send a trapper for Zabbix Server
-      echo "[Warning]: There are not free space in disk to make the backup"
+      z_trapper ${Z_BACKUP_JOB_STATUS_KEY} \
+      "[Critical]: The backup could not be performed. Recycling routine was not enough. Check the fyle system"
       exit 0
     fi 
   fi 
 
   # TODO: add variable to compress
   tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz ${FILE[*]}
-
+  
+  # Send a trapper after step
+  if [ "$?" -eq '0' ]; then
+    z_trapper ${Z_BACKUP_JOB_STATUS_KEY} \
+    "[OK]: Backup [${NAME}-${DATE_TODAY}.tar.gz] was successfully compressed"
+  fi 
   BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz | awk '{print $1}')
 
   # Threshold 1GiB
   if [ "${BACKUP_SIZE}" -ge '1073741824' ]; then
     mkdir -p ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}
+    
     # Fragments the backup into files smaller than 512MB each
     split -b 100M -d ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
     ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_
+    
+    if [ "$?" -eq '0' ]; then
+      z_trapper ${Z_BACKUP_JOB_STATUS_KEY} \
+      "[Info]: Backup [${NAME}-${DATE_TODAY}.tar.gz] was fragmented!"
+    fi
+    
     ### Call functions
     # Checksum # TODO => work with fragments
     hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
@@ -120,6 +146,8 @@ regular_file_backup ()
       aws_s3sync ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_* \
       ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz.${CHECKSUM_TYPE}
       if [ "$?" -eq "0" ]; then
+        z_trapper ${Z_BACKUP_JOB_STATUS_KEY} \
+        "[Info]: Backup [${NAME}-${DATE_TODAY}.tar.gz] was successfully copied!"
         rm -rf ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}
       fi
     fi
@@ -136,6 +164,11 @@ regular_file_backup ()
       # AWS S3 Sync
       aws_s3sync ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
       ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz.${CHECKSUM_TYPE}
+      
+      if [ "$?" -eq "0" ]; then
+        z_trapper ${Z_BACKUP_JOB_STATUS_KEY} \
+        "[Info]: Backup [${NAME}-${DATE_TODAY}.tar.gz] was successfully copied!"
+      fi
     fi
   fi
   # Recicly
