@@ -90,6 +90,7 @@ regular_file_backup ()
     recicly ${STORAGE}/${TYPE}/${NAME}
     if [ ${FILE_JOB_SIZE} -ge ${STORAGE_SIZE} ]; then
       # TODO: Send a trapper for Zabbix Server
+      echo "[Warning]: There are not free space in disk to make the backup"
       exit 0
     fi 
   fi 
