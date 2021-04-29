@@ -69,3 +69,6 @@ build_config_clients
 
 # Apply backup-agent execution
 backup_agent_apply
+
+# TODO
+# Implement catalog

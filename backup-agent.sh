@@ -3,6 +3,9 @@
 # this function should validate the variable COMPRESS_ALG and
 # then apply the correct compressor
 
+### TODO
+# add function to monitoring disk space and execute backup only there are free space
+
 DATE_TODAY=$(date +%d-%m-%Y)
 
 # Test: [OK]
@@ -14,10 +17,14 @@ trapper ()
 # Test: [OK]
 recicly ()
 {
-  for DIR in $1; do
-    find ${DIR}/ -maxdepth 1 -type f -iname "${NAME}*" -mtime +${RETENTION} -exec rm -f {} \;
-    find ${DIR}/logs/ -maxdepth 1 -type f -iname "${NAME}*" -mtime +${RETENTION} -exec rm -f {} \;
-  done
+  if [ "${RETENTION}" -eq '0' ]; then
+    find "$1"/ -maxdepth 1 -type f -iname "${NAME}*" -exec rm -f {} \;
+  else 
+    for DIR in $1; do
+      find ${DIR}/ -maxdepth 1 -type f -iname "${NAME}*" -mtime +${RETENTION} -exec rm -f {} \;
+      find ${DIR}/logs/ -maxdepth 1 -type f -iname "${NAME}*" -mtime +${RETENTION} -exec rm -f {} \;
+    done
+  fi
 }
 
 # Test: [OK]
@@ -73,6 +80,19 @@ regular_file_backup ()
   else
     mkdir -p ${STORAGE}/${TYPE}/${NAME}/logs
   fi
+
+  # Calculate files size to backup
+  FILE_JOB_SIZE="$(du -sck ${FILE[*]} | grep total | awk '{print $1}')"
+  STORAGE_SIZE="$(df -k ${STORAGE} | awk '{print $4}' | grep -vi 'available')"
+
+  if [ ${FILE_JOB_SIZE} -ge ${STORAGE_SIZE} ]; then
+    # Not run backup and send trapper to Zabbix Server
+    recicly ${STORAGE}/${TYPE}/${NAME}
+    if [ ${FILE_JOB_SIZE} -ge ${STORAGE_SIZE} ]; then
+      # TODO: Send a trapper for Zabbix Server
+      exit 0
+    fi 
+  fi 
 
   # TODO: add variable to compress
   tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz ${FILE[*]}
