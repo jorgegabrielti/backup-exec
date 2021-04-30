@@ -106,7 +106,6 @@ regular_file_backup ()
     recicly ${STORAGE}/${TYPE}/${NAME}
     if [ ${FILE_JOB_SIZE} -ge ${STORAGE_SIZE} ]; then
       JOB_REPORT_MSG_COMPRESS="[Critical]: The backup could not be performed. Recycling routine was not enough. Check the fyle system."
-      exit 0
     fi 
   fi 
 
@@ -117,12 +116,6 @@ regular_file_backup ()
     MSG_JOB_REPORT_COMPRESS="FAIL" \
     JOB_REPORT_MSG_COMPRESS="[Critical]: Backup could not be performed!"
 
-  
-  # Send a trapper after step
-  if [ "$?" -eq '0' ]; then
-    z_trapper ${Z_BACKUP_JOB_STATUS_KEY} \
-    "[OK]: Backup [${NAME}-${DATE_TODAY}.tar.gz] was successfully compressed!"
-  fi 
   BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz | awk '{print $1}')
 
   # Threshold 1GiB
@@ -158,6 +151,7 @@ regular_file_backup ()
       fi
     fi
   else
+    
     ### Call functions
     # Checksum
     hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz
