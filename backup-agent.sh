@@ -115,7 +115,7 @@ regular_file_backup ()
   # Send a trapper after step
   if [ "$?" -eq '0' ]; then
     z_trapper ${Z_BACKUP_JOB_STATUS_KEY} \
-    "[OK]: Backup [${NAME}-${DATE_TODAY}.tar.gz] was successfully compressed"
+    "[OK]: Backup [${NAME}-${DATE_TODAY}.tar.gz] was successfully compressed!"
   fi 
   BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz | awk '{print $1}')
 
