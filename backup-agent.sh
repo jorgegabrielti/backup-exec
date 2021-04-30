@@ -98,19 +98,25 @@ regular_file_backup ()
   STORAGE_SIZE="$(df -k ${STORAGE} | awk '{print $4}' | grep -vi 'available')"
 
   if [ ${FILE_JOB_SIZE} -ge ${STORAGE_SIZE} ]; then
+    
     # Not run backup and send trapper to Zabbix Server
-    z_trapper ${Z_BACKUP_JOB_STATUS_KEY} \
-    "[Warning]: There are not free space in disk to make the backup. Starting recycling routine..."
+    MSG_JOB_REPORT_COMPRESS="FAIL"
+    JOB_REPORT_MSG_COMPRESS="[Warning]: There are not free space in disk to make the backup. Starting recycling routine..."
+  
     recicly ${STORAGE}/${TYPE}/${NAME}
     if [ ${FILE_JOB_SIZE} -ge ${STORAGE_SIZE} ]; then
-      z_trapper ${Z_BACKUP_JOB_STATUS_KEY} \
-      "[Critical]: The backup could not be performed. Recycling routine was not enough. Check the fyle system"
+      JOB_REPORT_MSG_COMPRESS="[Critical]: The backup could not be performed. Recycling routine was not enough. Check the fyle system."
       exit 0
     fi 
   fi 
 
   # TODO: add variable to compress
-  tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz ${FILE[*]}
+  tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz ${FILE[*]} && \
+    MSG_JOB_REPORT_COMPRESS="OK" \
+    JOB_REPORT_MSG_COMPRESS="[Info]: The backup was successfully compressed!" || \
+    MSG_JOB_REPORT_COMPRESS="FAIL" \
+    JOB_REPORT_MSG_COMPRESS="[Critical]: Backup could not be performed!"
+
   
   # Send a trapper after step
   if [ "$?" -eq '0' ]; then
