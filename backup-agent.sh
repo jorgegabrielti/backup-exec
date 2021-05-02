@@ -173,6 +173,8 @@ regular_file_backup ()
   fi
   # Recicly
   recicly ${STORAGE}/${TYPE}/${NAME}
+
+  # TODO: ADD ZABBIX TRAPPER FUNCTION TO SEND MESSAGES WITH STATUS JOBS
 }
 
 ### Build MySQL Backup with mysqldump
