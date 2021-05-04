@@ -264,6 +264,7 @@ LOGFILE
       fi
     fi
   done
+  # TODO: ADD ZABBIX TRAPPER FUNCTION TO SEND MESSAGES WITH STATUS JOBS
 }
 
 ### Build PostgreSQL Backup with pg_dump
@@ -296,6 +297,7 @@ sgbd_postgres_backup ()
       ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE}
     fi
   done
+  # TODO: ADD ZABBIX TRAPPER FUNCTION TO SEND MESSAGES WITH STATUS JOBS
 }
 
 
