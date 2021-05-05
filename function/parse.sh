@@ -34,6 +34,6 @@ parse () {
         echo "$j:${JOB_CONFIG[$j]}" >> ${FILE}.db
         let "j=j+1"
     done
-    grep Z_HOST ${FILE} > ${FILE}.db
+    grep Z_HOST ${FILE} >> ${FILE}.db
 }
 
