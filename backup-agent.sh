@@ -11,6 +11,7 @@ DATE_TODAY=$(date +%d-%m-%Y)
 # Test: [OK]
 z_trapper ()
 {
+  which zabbix_sender > /dev/null 2>&1 && echo "" || echo $(which zabbix_sender)
   ### Parameters
   # 1º: item.key variable
   # 2º: String message
@@ -23,7 +24,19 @@ z_trapper ()
   -p ${Z_SERVER_PORT} \
   -s ${Z_HOST} \
   -k ${ITEM_KEY} \
-  -o "$*"
+  -o "### Job status report
+      Name         : ${NAME}
+      ------------------------- 
+      Compress     : ${JOB_REPORT_STATUS_COMPRESS}:${JOB_REPORT_MSG_COMPRESS}
+      Checksum     : ${JOB_REPORT_STATUS_CHECKSUM}:${JOB_REPORT_MSG_CHECKSUM}
+      Copy         : ${JOB_REPORT_STATUS_COPY}:${JOB_REPORT_MSG_COPY}
+      Recycle      : ${JOB_REPORT_STATUS_RECYCLE}:${JOB_REPORT_MSG_RECYCLE}
+      
+      # Details
+      Backup file  : ${NAME}-${DATE_TODAY}.tar.gz
+      
+      Compress rate: 
+      Checksum     : <checksum>"
 }
 
 # Test: [OK]
@@ -92,89 +105,134 @@ regular_file_backup ()
   else
     mkdir -p ${STORAGE}/${TYPE}/${NAME}/logs
   fi
-
+  
   # Calculate files size to backup
   FILE_JOB_SIZE="$(du -sck ${FILE[*]} | grep total | awk '{print $1}')"
   STORAGE_SIZE="$(df -k ${STORAGE} | awk '{print $4}' | grep -vi 'available')"
 
   if [ ${FILE_JOB_SIZE} -ge ${STORAGE_SIZE} ]; then
-    
+
     # Not run backup and send trapper to Zabbix Server
-    MSG_JOB_REPORT_COMPRESS="FAIL"
+    JOB_REPORT_STATUS_COMPRESS="FAIL"
     JOB_REPORT_MSG_COMPRESS="[Warning]: There are not free space in disk to make the backup. Starting recycling routine..."
   
+    # Run recycle routine
     recicly ${STORAGE}/${TYPE}/${NAME}
+
     if [ ${FILE_JOB_SIZE} -ge ${STORAGE_SIZE} ]; then
+      FREE_DISK_AFTER_RECYCLE="NO"
       JOB_REPORT_MSG_COMPRESS="[Critical]: The backup could not be performed. Recycling routine was not enough. Check the fyle system."
+    else 
+      FREE_DISK_AFTER_RECYCLE="YES"
     fi 
+    
+    if [ "${FREE_DISK_AFTER_RECYCLE}" == "YES" ]; then
+      tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz ${FILE[*]}
+      STATUS_COMPRESS="$?"
+    fi
+  else
+    tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz ${FILE[*]}
+    STATUS_COMPRESS="$?"
   fi 
 
-  # TODO: add variable to compress
-  tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz ${FILE[*]} && \
-    MSG_JOB_REPORT_COMPRESS="OK" \
-    JOB_REPORT_MSG_COMPRESS="[Info]: The backup was successfully compressed!" || \
-    MSG_JOB_REPORT_COMPRESS="FAIL" \
-    JOB_REPORT_MSG_COMPRESS="[Critical]: Backup could not be performed!"
 
-  BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz | awk '{print $1}')
-
-  # Threshold 1GiB
-  if [ "${BACKUP_SIZE}" -ge '1073741824' ]; then
-    mkdir -p ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}
+  # Validation of compress
+  if [ "${STATUS_COMPRESS}" -eq '0' ]; then
+    JOB_REPORT_STATUS_COMPRESS="OK"
+    JOB_REPORT_MSG_COMPRESS="[Info]: The backup was successfully compressed!" 
     
-    # Fragments the backup into files smaller than 512MB each
-    split -b 100M -d ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
-    ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_
-    
-    if [ "$?" -eq '0' ]; then
-      z_trapper ${Z_BACKUP_JOB_STATUS_KEY} \
-      "[Info]: Backup [${NAME}-${DATE_TODAY}.tar.gz] was fragmented!"
-    fi
-    
-    ### Call functions
-    # Checksum # TODO => work with fragments
-    hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
-    ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_*
+    # Calculating backup size
+    BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz | awk '{print $1}')
 
-    ### Copy to AWS S3
-    if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
-      # AWS Assume Role
-      aws_assume_role
+    # Threshold 1GiB
+    if [ "${BACKUP_SIZE}" -ge '1073741824' ]; then
+      mkdir -p ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}
+    
+      # Fragments the backup into files smaller than 512MB each
+      split -b 100M -d ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
+      ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_
+    
+      if [ "$?" -eq '0' ]; then
+        JOB_REPORT_STATUS_FRAGMENT="OK"
+        JOB_REPORT_MSG_FRAGMENT="[Info]: Backup [${NAME}-${DATE_TODAY}.tar.gz] was fragmented!"
+      fi
+    
+      ### Call functions
+      # Checksum # TODO => work with fragments
+      hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
+      ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_*
+      
+      if [ "$?" -eq '0' ]; then
+        JOB_REPORT_STATUS_CHECKSUM=OK
+        JOB_REPORT_MSG_CHECKSUM=$(cat "${1/%_00/}".${CHECKSUM_TYPE})
+      fi 
 
-      # AWS S3 Sync
-      aws_s3sync ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_* \
-      ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz.${CHECKSUM_TYPE}
-      if [ "$?" -eq "0" ]; then
-        z_trapper ${Z_BACKUP_JOB_STATUS_KEY} \
-        "[Info]: Backup [${NAME}-${DATE_TODAY}.tar.gz] was successfully copied!"
-        rm -rf ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}
+      ### Copy to AWS S3
+      if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
+        # AWS Assume Role
+        aws_assume_role
+
+        # AWS S3 Sync
+        aws_s3sync ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz_* \
+        ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz.${CHECKSUM_TYPE}
+      
+        if [ "$?" -eq "0" ]; then
+          JOB_REPORT_STATUS_COPY="OK"        
+          JOB_REPORT_MSG_COPY="[Info]: Backup [${NAME}-${DATE_TODAY}.tar.gz] was successfully copied!"
+          rm -rf ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}
+        fi
+      fi
+    else
+      ### Call functions
+      # Checksum # TODO => work with fragments
+      hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz
+      
+      if [ "$?" -eq '0' ]; then
+        JOB_REPORT_STATUS_CHECKSUM=OK
+        JOB_REPORT_MSG_CHECKSUM=$(cat ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz.${CHECKSUM_TYPE})
+      fi 
+
+      ### Copy to AWS S3
+      if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
+        # AWS Assume Role
+        aws_assume_role
+
+        # AWS S3 Sync
+        aws_s3sync ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
+        ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz.${CHECKSUM_TYPE}
+      
+        if [ "$?" -eq "0" ]; then
+          JOB_REPORT_STATUS_COPY="OK"        
+          JOB_REPORT_MSG_COPY="[Info]: Backup [${NAME}-${DATE_TODAY}.tar.gz] was successfully copied!"
+        fi
       fi
     fi
   else
-    
-    ### Call functions
-    # Checksum
-    hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz
-
-    ### Copy to AWS S3
-    if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
-      # AWS Assume Role
-      aws_assume_role
-
-      # AWS S3 Sync
-      aws_s3sync ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
-      ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz.${CHECKSUM_TYPE}
-      
-      if [ "$?" -eq "0" ]; then
-        z_trapper ${Z_BACKUP_JOB_STATUS_KEY} \
-        "[Info]: Backup [${NAME}-${DATE_TODAY}.tar.gz] was successfully copied!"
-      fi
-    fi
+    MSG_JOB_REPORT_COMPRESS="FAIL" 
+    JOB_REPORT_MSG_COMPRESS="[Critical]: Backup could not be performed!"
   fi
+
   # Recicly
   recicly ${STORAGE}/${TYPE}/${NAME}
+  if [ "$?" -eq '0' ]; then
+    JOB_REPORT_STATUS_RECYCLE="OK"
+    JOB_REPORT_MSG_RECYCLE="[Info]: Recycling routine successfully executed!"
+  else
+    JOB_REPORT_STATUS_RECYCLE="FAIL"
+    JOB_REPORT_MSG_RECYCLE="[Warnig]: Recycling routine failed!"
+  fi 
 
   # TODO: ADD ZABBIX TRAPPER FUNCTION TO SEND MESSAGES WITH STATUS JOBS
+  z_trapper ${JOB_REPORT_STATUS_COMPRESS} \
+            ${JOB_REPORT_STATUS_FRAGMENT} \
+            ${JOB_REPORT_STATUS_CHECKSUM} \
+            ${JOB_REPORT_STATUS_COPY} \
+            ${JOB_REPORT_STATUS_RECYCLE} \
+            ${JOB_REPORT_MSG_COMPRESS} \
+            ${JOB_REPORT_MSG_FRAGMENT} \
+            ${JOB_REPORT_MSG_CHECKSUM} \
+            ${JOB_REPORT_MSG_COPY} \
+            ${JOB_REPORT_MSG_RECYCLE} 
 }
 
 ### Build MySQL Backup with mysqldump
