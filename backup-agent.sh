@@ -132,8 +132,8 @@ regular_file_backup ()
     # Calculating backup size
     BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz | awk '{print $1}')
 
-    # Threshold 1GiB
-    if [ "${BACKUP_SIZE}" -ge '1073741824' ]; then
+    # Threshold 100 MiB
+    if [ "${BACKUP_SIZE}" -ge '104857600' ]; then
       mkdir -p ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}
     
       # Fragments the backup into files smaller than 512MB each

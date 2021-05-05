@@ -10,7 +10,7 @@ build_config_clients () {
 
     if [ ! -e ${PSSH_HOSTS} ]; then
         for FILE in ${WORK_DIR}/conf/include/*.conf; do
-            CLIENT=$(grep -E 'USER=|HOST=' ${FILE} \
+            CLIENT=$(grep -E '^USER=|^HOST=' ${FILE} \
             | cut -d'=' -f2 \
             | sort -r | paste -s \
             | tr -s '[:blank:]' '@') 
@@ -19,7 +19,7 @@ build_config_clients () {
     else 
         rm -f ${PSSH_HOSTS}
         for FILE in ${WORK_DIR}/conf/include/*.conf; do
-            CLIENT=$(grep -E 'USER=|HOST=' ${FILE} \
+            CLIENT=$(grep -E '^USER=|^HOST=' ${FILE} \
             | cut -d'=' -f2 \
             | sort -r | paste -s \
             | tr -s '[:blank:]' '@') 
@@ -29,7 +29,7 @@ build_config_clients () {
     
     # Build pssh file hosts
     for FILE in ${WORK_DIR}/conf/include/*.conf; do
-        CLIENT=$(grep -E 'USER=|HOST=' ${FILE} \
+        CLIENT=$(grep -E '^USER=|^HOST=' ${FILE} \
         | cut -d'=' -f2 \
         | sort -r | paste -s \
         | tr -s '[:blank:]' '@')
