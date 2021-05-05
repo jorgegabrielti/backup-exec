@@ -12,6 +12,8 @@ parse () {
     # Identified directives 'job {}'
     export JOB_NUMBERS=$(echo "$(grep -Enc '^job.*{|}' "${FILE}")/2" | bc) 
     echo $JOB_NUMBERS
+
+
     # Get job configuration
     j=0
     for ((i=2; i<=$((${JOB_NUMBERS}*2)); i=i+2)); do 
@@ -32,5 +34,6 @@ parse () {
         echo "$j:${JOB_CONFIG[$j]}" >> ${FILE}.db
         let "j=j+1"
     done
+    grep Z_HOST ${FILE} > ${FILE}.db
 }
 

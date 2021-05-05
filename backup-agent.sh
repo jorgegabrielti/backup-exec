@@ -152,7 +152,7 @@ regular_file_backup ()
       
       if [ "$?" -eq '0' ]; then
         JOB_REPORT_STATUS_CHECKSUM=OK
-        JOB_REPORT_MSG_CHECKSUM=$(cat "${1/%_00/}".${CHECKSUM_TYPE})
+        JOB_REPORT_MSG_CHECKSUM=$(cat ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz_00.${CHECKSUM_TYPE})
       fi 
 
       ### Copy to AWS S3
