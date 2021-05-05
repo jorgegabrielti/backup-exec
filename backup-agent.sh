@@ -47,6 +47,7 @@ hash_checksum ()
     ${CHECKSUM_TYPE}sum $1 > "$1".${CHECKSUM_TYPE}
     shift
     for FRAGMENT in "$@"; do
+      echo "${1/%_00/}".${CHECKSUM_TYPE}
       ${CHECKSUM_TYPE}sum ${FRAGMENT} >> "${1/%_00/}".${CHECKSUM_TYPE}
     done
   else
@@ -57,6 +58,7 @@ hash_checksum ()
 # Test: [OK]
 aws_s3sync ()
 {
+  # TODO: add fix to error => pload failed: An error occurred (RequestTimeout) when calling the UploadPart operation (reached max retries: 2): Your socket connection to the server was not read from or written to within the timeout period. Idle connections will be closed.
   if [ "${#@}" -gt "2" ]; then
     time for BACKUP in ${@}; do
            time /usr/local/bin/aws s3 cp ${BACKUP} s3://${BUCKET}/${NAME}/${DATE_TODAY}/
@@ -152,7 +154,7 @@ regular_file_backup ()
       
       if [ "$?" -eq '0' ]; then
         JOB_REPORT_STATUS_CHECKSUM=OK
-        JOB_REPORT_MSG_CHECKSUM=$(cat ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz_00.${CHECKSUM_TYPE})
+        JOB_REPORT_MSG_CHECKSUM=$(cat ${STORAGE}/${TYPE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.tar.gz.${CHECKSUM_TYPE})
       fi 
 
       ### Copy to AWS S3
@@ -212,19 +214,17 @@ regular_file_backup ()
 
   # TODO: ADD ZABBIX TRAPPER FUNCTION TO SEND MESSAGES WITH STATUS JOBS
 cat > /tmp/.report.txt <<-REPORTFILE
- ******* Job status report *******
-   Name         : ${NAME}
-   ------------------------- 
-   Compress     : ${JOB_REPORT_STATUS_COMPRESS}:${JOB_REPORT_MSG_COMPRESS}
-   Checksum     : ${JOB_REPORT_STATUS_CHECKSUM}:${JOB_REPORT_MSG_CHECKSUM}
-   Copy         : ${JOB_REPORT_STATUS_COPY}:${JOB_REPORT_MSG_COPY}
-   Recycle      : ${JOB_REPORT_STATUS_RECYCLE}:${JOB_REPORT_MSG_RECYCLE}
+******* Job status report *******
+Name         : ${NAME}
+--------------------------------------------- 
+Compress     : ${JOB_REPORT_MSG_COMPRESS}
+Checksum     : ${JOB_REPORT_MSG_CHECKSUM}
+Copy         : ${JOB_REPORT_MSG_COPY}
+Recycle      : ${JOB_REPORT_MSG_RECYCLE}
 
-   # Details
-   Backup file  : ${NAME}-${DATE_TODAY}.tar.gz
-
-   Compress rate: 
-   Checksum     : <checksum>
+# Details
+Backup file  : ${NAME}-${DATE_TODAY}.tar.gz
+Checksum     : <checksum>
 REPORTFILE
 
   z_trapper ${Z_BACKUP_JOB_STATUS_KEY} /tmp/.report.txt  
