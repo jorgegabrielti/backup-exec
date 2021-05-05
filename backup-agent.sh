@@ -24,19 +24,7 @@ z_trapper ()
   -p ${Z_SERVER_PORT} \
   -s ${Z_HOST} \
   -k ${ITEM_KEY} \
-  -o "### Job status report
-      Name         : ${NAME}
-      ------------------------- 
-      Compress     : ${JOB_REPORT_STATUS_COMPRESS}:${JOB_REPORT_MSG_COMPRESS}
-      Checksum     : ${JOB_REPORT_STATUS_CHECKSUM}:${JOB_REPORT_MSG_CHECKSUM}
-      Copy         : ${JOB_REPORT_STATUS_COPY}:${JOB_REPORT_MSG_COPY}
-      Recycle      : ${JOB_REPORT_STATUS_RECYCLE}:${JOB_REPORT_MSG_RECYCLE}
-      
-      # Details
-      Backup file  : ${NAME}-${DATE_TODAY}.tar.gz
-      
-      Compress rate: 
-      Checksum     : <checksum>"
+  -o "$(cat $1)"
 }
 
 # Test: [OK]
@@ -223,16 +211,23 @@ regular_file_backup ()
   fi 
 
   # TODO: ADD ZABBIX TRAPPER FUNCTION TO SEND MESSAGES WITH STATUS JOBS
-  z_trapper ${JOB_REPORT_STATUS_COMPRESS} \
-            ${JOB_REPORT_STATUS_FRAGMENT} \
-            ${JOB_REPORT_STATUS_CHECKSUM} \
-            ${JOB_REPORT_STATUS_COPY} \
-            ${JOB_REPORT_STATUS_RECYCLE} \
-            ${JOB_REPORT_MSG_COMPRESS} \
-            ${JOB_REPORT_MSG_FRAGMENT} \
-            ${JOB_REPORT_MSG_CHECKSUM} \
-            ${JOB_REPORT_MSG_COPY} \
-            ${JOB_REPORT_MSG_RECYCLE} 
+cat > /tmp/.report.txt <<-REPORTFILE
+ ******* Job status report *******
+   Name         : ${NAME}
+   ------------------------- 
+   Compress     : ${JOB_REPORT_STATUS_COMPRESS}:${JOB_REPORT_MSG_COMPRESS}
+   Checksum     : ${JOB_REPORT_STATUS_CHECKSUM}:${JOB_REPORT_MSG_CHECKSUM}
+   Copy         : ${JOB_REPORT_STATUS_COPY}:${JOB_REPORT_MSG_COPY}
+   Recycle      : ${JOB_REPORT_STATUS_RECYCLE}:${JOB_REPORT_MSG_RECYCLE}
+
+   # Details
+   Backup file  : ${NAME}-${DATE_TODAY}.tar.gz
+
+   Compress rate: 
+   Checksum     : <checksum>
+REPORTFILE
+
+  z_trapper ${Z_BACKUP_JOB_STATUS_KEY} /tmp/.report.txt  
 }
 
 ### Build MySQL Backup with mysqldump
