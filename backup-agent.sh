@@ -218,13 +218,12 @@ cat > /tmp/.report.txt <<-REPORTFILE
 Name         : ${NAME}
 --------------------------------------------- 
 Compress     : ${JOB_REPORT_MSG_COMPRESS}
-Checksum     : ${JOB_REPORT_MSG_CHECKSUM}
 Copy         : ${JOB_REPORT_MSG_COPY}
 Recycle      : ${JOB_REPORT_MSG_RECYCLE}
 
 # Details
 Backup file  : ${NAME}-${DATE_TODAY}.tar.gz
-Checksum     : <checksum>
+Checksum     : ${JOB_REPORT_MSG_CHECKSUM}
 REPORTFILE
 
   z_trapper ${Z_BACKUP_JOB_STATUS_KEY} /tmp/.report.txt  
