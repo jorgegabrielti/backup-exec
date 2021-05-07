@@ -34,7 +34,7 @@ build_config_clients () {
         | sort -r | paste -s \
         | tr -s '[:blank:]' '@')
         parse ${FILE}
-        scp backup-agent.sh ${GLOBAL_CONFIG} ${FILE}.db ${CLIENT}:/tmp/
+        scp backup-agent.sh ${GLOBAL_CONFIG} ${FILE}.db backup_job_discovery.sh ${CLIENT}:/tmp/
         rm -f ${FILE}.db 
     done
     rm -f ${GLOBAL_CONFIG}
