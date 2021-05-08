@@ -12,6 +12,7 @@ DATE_TODAY=$(date +%d-%m-%Y)
 z_trapper ()
 {
   which zabbix_sender > /dev/null 2>&1 && echo "" || echo $(which zabbix_sender)
+  Z_HOST=$(zabbix_agentd --help | grep default | cut -d':' -f2 | tr -d '"|)|(' | xargs grep -E '^Hostname' | cut -d'=' -f2)
   ### Parameters
   # 1º: item.key variable
   # 2º: String message
