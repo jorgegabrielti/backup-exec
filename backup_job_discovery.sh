@@ -1,5 +1,5 @@
 #!/bin/bash
-source global-config
+source /tmp/global-config
 FILE=$1
 
 Z_HOST=$(zabbix_agentd --help | grep default | cut -d':' -f2 | tr -d '"|)|(' | xargs grep -E '^Hostname' | cut -d'=' -f2)
