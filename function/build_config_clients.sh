@@ -2,7 +2,7 @@
 build_config_clients () {
     
     # Global config
-    GLOBAL_CONFIG="conf/include/backup.conf.db"
+    GLOBAL_CONFIG="conf/include/global-config"
     grep -Ev '^$|^#' conf/backup.conf | grep -vi include > ${GLOBAL_CONFIG}
 
     # Build pssh file hosts
