@@ -33,9 +33,11 @@ recicly ()
 {
   if [ "${RETENTION}" -eq '0' ]; then
     find "$1"/ -maxdepth 1 -type f -iname "${NAME}*" -exec rm -f {} \;
-  else 
+    find "$1"/fragments -type f -iname "${NAME}*" -exec rm -f {} \;
+  else
     for DIR in $1; do
       find ${DIR}/ -maxdepth 1 -type f -iname "${NAME}*" -mtime +${RETENTION} -exec rm -f {} \;
+      find ${DIR}/fragments -type f -iname "${NAME}*" -mtime +${RETENTION} -exec rm -f {} \;
       find ${DIR}/logs/ -maxdepth 1 -type f -iname "${NAME}*" -mtime +${RETENTION} -exec rm -f {} \;
     done
   fi
