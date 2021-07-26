@@ -80,7 +80,7 @@ aws_assume_role ()
    unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
 
    # User assume role
-   /usr/local/bin/aws sts assume-role --role-arn ${ARN_ROLE} --role-session-name appsMakerAssumeRole \
+   sudo /usr/local/bin/aws sts assume-role --role-arn ${ARN_ROLE} --role-session-name appsMakerAssumeRole \
    > /tmp/.assumeRole.tmp
 
    # Get secrets
