@@ -121,16 +121,16 @@ regular_file_backup ()
     
     if [ "${FREE_DISK_AFTER_RECYCLE}" == "YES" ]; then
       tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz ${FILE[*]}
-      STATUS_COMPRESS="$?"
+      STATUS_COMPRESS="$(gzip -t ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz && echo $?)"
     fi
   else
     tar zcvf ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz ${FILE[*]}
-    STATUS_COMPRESS="$?"
+    STATUS_COMPRESS="$(gzip -t ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz && echo $?)"
   fi 
 
 
   # Validation of compress
-  if [ "${STATUS_COMPRESS}" -eq '0' ]; then
+  if [ "${STATUS_COMPRESS}" == "0" ]; then
     JOB_REPORT_STATUS_COMPRESS="OK"
     JOB_REPORT_MSG_COMPRESS="[Info]: The backup was successfully compressed!" 
     
