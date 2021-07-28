@@ -17,7 +17,7 @@ z_trapper ()
   # 1º: item.key variable
   # 2º: String message
   
-  ITEM_KEY="backup.job.status["$1"]"
+  ITEM_KEY=$1
   shift
 
   /usr/bin/zabbix_sender \
@@ -229,7 +229,8 @@ Backup file  : ${NAME}-${DATE_TODAY}.tar.gz
 Checksum     : ${JOB_REPORT_MSG_CHECKSUM}
 REPORTFILE
 
-  z_trapper ${NAME} /tmp/.report.txt  
+  z_trapper backup.job["$NAME",report] /tmp/.report.txt
+  z_trapper backup.job["$NAME",status] /tmp/.report.txt
 }
 
 ### Build MySQL Backup with mysqldump
