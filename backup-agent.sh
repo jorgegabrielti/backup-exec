@@ -234,6 +234,7 @@ REPORTFILE
 }
 
 ### Build MySQL Backup with mysqldump
+# TODO: add function zabbix_sender
 sgbd_mysql_backup ()
 {
   for BASE in ${DATABASE[*]}; do
@@ -324,6 +325,7 @@ LOGFILE
 }
 
 ### Build PostgreSQL Backup with pg_dump
+# TODO: add function zabbix_sender
 sgbd_postgres_backup ()
 {
   for BASE in ${DATABASE[*]}; do
