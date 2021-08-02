@@ -177,7 +177,6 @@ regular_file_backup ()
       fi
     else
       ### Call functions
-      # Checksum # TODO => work with fragments
       hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz
       
       if [ "$?" -eq '0' ]; then
@@ -339,23 +338,132 @@ sgbd_postgres_backup ()
     # Apply permission to user ${USER_POSTGRES} to write
     chown ${USER_POSTGRESQL}. ${STORAGE}/${TYPE}/${BASE}/${NAME}/ -R
 
-    su -c "/usr/bin/pg_dump ${BASE} | ${COMPRESS_ALG} -c \
-    > ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2" \
-    -l ${USER_POSTGRESQL}
+    # Calculate files size to backup
+    FILE_JOB_SIZE="$(du -sck ${BASE} | grep total | awk '{print $1}')"
+    STORAGE_SIZE="$(df -k ${STORAGE} | awk '{print $4}' | grep -vi 'available')"
 
-    # Checksum
-    hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2
-    
-    if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
-      # AWS Assume Role
-      aws_assume_role
+    if [ ${FILE_JOB_SIZE} -ge ${STORAGE_SIZE} ]; then
+        # Not run backup and send trapper to Zabbix Server
+        JOB_REPORT_STATUS_COMPRESS="FAIL"
+        JOB_REPORT_MSG_COMPRESS="[Warning]: There are not free space in disk to make the backup. Starting recycling routine..."
 
-      # AWS S3 Sync
-      aws_s3sync ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 \
-      ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE}
+        # Run recycle routine
+        recicly ${STORAGE}/${TYPE}/${BASE}/${NAME}
+
+        if [ ${FILE_JOB_SIZE} -ge ${STORAGE_SIZE} ]; then
+          FREE_DISK_AFTER_RECYCLE="NO"
+          JOB_REPORT_MSG_COMPRESS="[Critical]: The backup could not be performed. Recycling routine was not enough. Check the fyle system."
+        else 
+          FREE_DISK_AFTER_RECYCLE="YES"
+        fi
+
+        if [ "${FREE_DISK_AFTER_RECYCLE}" == "YES" ]; then
+            su -c "/usr/bin/pg_dump ${BASE} | ${COMPRESS_ALG} -c \
+                > ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2" \
+                -l ${USER_POSTGRESQL}
+            
+            STATUS_COMPRESS="$(bzip2 --test ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 && echo $?)"
+        fi
+    else
+        su -c "/usr/bin/pg_dump ${BASE} | ${COMPRESS_ALG} -c \
+                > ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2" \
+                -l ${USER_POSTGRESQL}
+
+        STATUS_COMPRESS="$(bzip2 --test ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 && echo $?)"
     fi
-  done
+
+    # Validation of compress
+    if [ "${STATUS_COMPRESS}" == "0" ]; then
+        JOB_REPORT_STATUS_COMPRESS="OK"
+        JOB_REPORT_MSG_COMPRESS="[Info]: The backup was successfully compressed!"
+
+        # Calculating backup size
+        BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 | awk '{print $1}')
+
+        # Threshold 100 MiB
+        if [ "${BACKUP_SIZE}" -ge '104857600' ]; then
+            mkdir -p ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${DATE_TODAY}
+
+            # Fragments the backup into files smaller than 512MB each
+            split -b 100M -d ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 \
+            ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.psql.bzip2_ 
+
+            if [ "$?" -eq '0' ]; then
+                JOB_REPORT_STATUS_FRAGMENT="OK"
+                JOB_REPORT_MSG_FRAGMENT="[Info]: Backup [${BASE}-${DATE_TODAY}.psql.bzip2] was fragmented!"
+            fi
+
+            ### Call functions
+            # Checksum # TODO => work with fragments
+            hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 \
+            ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.psql.bzip2_*   
+
+            if [ "$?" -eq '0' ]; then
+                JOB_REPORT_STATUS_CHECKSUM=OK
+                JOB_REPORT_MSG_CHECKSUM=$(cat ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE})
+            fi
+
+            ### Copy to AWS S3
+            if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
+                # AWS Assume Role
+                aws_assume_role
+
+                # AWS S3 Sync
+                aws_s3sync ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.psql.bzip2_* \
+                ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE}
+      
+                if [ "$?" -eq "0" ]; then
+                    JOB_REPORT_STATUS_COPY="OK"        
+                    JOB_REPORT_MSG_COPY="[Info]: Backup [${BASE}-${DATE_TODAY}.psql.bzip2] was successfully copied!"
+                    rm -rf ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${DATE_TODAY}
+                fi
+            fi
+        else
+            ### Call functions
+            hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz
+      
+            if [ "$?" -eq '0' ]; then
+                JOB_REPORT_STATUS_CHECKSUM=OK
+                JOB_REPORT_MSG_CHECKSUM=$(cat ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE})
+            fi 
+
+            ### Copy to AWS S3
+            if [ ! -z "${ARN_ROLE}" -a ! -z "${AWS_USER}" -a ! -z "${BUCKET}" ]; then
+                # AWS Assume Role
+                aws_assume_role
+
+                # AWS S3 Sync
+                aws_s3sync ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
+                ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz.${CHECKSUM_TYPE}
+      
+                if [ "$?" -eq "0" ]; then
+                    JOB_REPORT_STATUS_COPY="OK"        
+                    JOB_REPORT_MSG_COPY="[Info]: Backup [${BASE}-${DATE_TODAY}.psql.bzip2] was successfully copied!"
+                fi
+            fi
+        fi
+    else
+      MSG_JOB_REPORT_COMPRESS="FAIL" 
+      JOB_REPORT_MSG_COMPRESS="[Critical]: Backup could not be performed!"
+    fi     
+  
   # TODO: ADD ZABBIX TRAPPER FUNCTION TO SEND MESSAGES WITH STATUS JOBS
+cat > /tmp/.report.txt <<-REPORTFILE
+******* Job status report *******
+Name         : ${NAME}
+--------------------------------------------- 
+Compress     : ${JOB_REPORT_MSG_COMPRESS}
+Copy         : ${JOB_REPORT_MSG_COPY}
+Recycle      : ${JOB_REPORT_MSG_RECYCLE}
+
+# Details
+Backup file  : ${BASE}-${DATE_TODAY}.psql.bzip2
+Checksum     : ${JOB_REPORT_MSG_CHECKSUM}
+REPORTFILE
+
+  z_trapper backup.job["$NAME",report] /tmp/.report.txt
+  z_trapper backup.job["$NAME",status] /tmp/.report.txt
+  done
 }
 
 
