@@ -446,7 +446,17 @@ sgbd_postgres_backup ()
       MSG_JOB_REPORT_COMPRESS="FAIL" 
       JOB_REPORT_MSG_COMPRESS="[Critical]: Backup could not be performed!"
     fi     
-  
+    
+    # Recicly
+    recicly ${STORAGE}/${TYPE}/${BASE}/${NAME}
+    if [ "$?" -eq '0' ]; then
+      JOB_REPORT_STATUS_RECYCLE="OK"
+      JOB_REPORT_MSG_RECYCLE="[Info]: Recycling routine successfully executed!"
+    else
+      JOB_REPORT_STATUS_RECYCLE="FAIL"
+      JOB_REPORT_MSG_RECYCLE="[Warnig]: Recycling routine failed!"
+    fi
+    
   # TODO: ADD ZABBIX TRAPPER FUNCTION TO SEND MESSAGES WITH STATUS JOBS
 cat > /tmp/.report.txt <<-REPORTFILE
 ******* Job status report *******
