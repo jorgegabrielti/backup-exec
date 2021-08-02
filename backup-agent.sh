@@ -420,7 +420,7 @@ sgbd_postgres_backup ()
             fi
         else
             ### Call functions
-            hash_checksum ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz
+            hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2
       
             if [ "$?" -eq '0' ]; then
                 JOB_REPORT_STATUS_CHECKSUM=OK
@@ -433,8 +433,8 @@ sgbd_postgres_backup ()
                 aws_assume_role
 
                 # AWS S3 Sync
-                aws_s3sync ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz \
-                ${STORAGE}/${TYPE}/${NAME}/${NAME}-${DATE_TODAY}.tar.gz.${CHECKSUM_TYPE}
+                aws_s3sync ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 \
+               ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE}
       
                 if [ "$?" -eq "0" ]; then
                     JOB_REPORT_STATUS_COPY="OK"        
