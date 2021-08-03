@@ -390,7 +390,7 @@ sgbd_postgres_backup ()
 
             if [ "$?" -eq '0' ]; then
                 JOB_REPORT_STATUS_FRAGMENT="OK"
-                JOB_REPORT_MSG_FRAGMENT="[Info]: Backup [${BASE}-${DATE_TODAY}.psql.bzip2] was fragmented!"
+                JOB_REPORT_MSG_FRAGMENT="[Info]: Backup [${NAME}-${DATE_TODAY}.psql.bzip2] was fragmented!"
             fi
 
             ### Call functions
@@ -414,7 +414,7 @@ sgbd_postgres_backup ()
       
                 if [ "$?" -eq "0" ]; then
                     JOB_REPORT_STATUS_COPY="OK"        
-                    JOB_REPORT_MSG_COPY="[Info]: Backup [${BASE}-${DATE_TODAY}.psql.bzip2] was successfully copied!"
+                    JOB_REPORT_MSG_COPY="[Info]: Backup [${NAME}-${DATE_TODAY}.psql.bzip2] was successfully copied!"
                     rm -rf ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${DATE_TODAY}
                 fi
             fi
@@ -438,7 +438,7 @@ sgbd_postgres_backup ()
       
                 if [ "$?" -eq "0" ]; then
                     JOB_REPORT_STATUS_COPY="OK"        
-                    JOB_REPORT_MSG_COPY="[Info]: Backup [${BASE}-${DATE_TODAY}.psql.bzip2] was successfully copied!"
+                    JOB_REPORT_MSG_COPY="[Info]: Backup [${NAME}-${DATE_TODAY}.psql.bzip2] was successfully copied!"
                 fi
             fi
         fi
