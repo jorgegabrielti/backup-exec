@@ -339,7 +339,7 @@ sgbd_postgres_backup ()
     chown ${USER_POSTGRESQL}. ${STORAGE}/${TYPE}/${BASE}/${NAME}/ -R
 
     # Calculate files size to backup
-    FILE_JOB_SIZE="$(du -sck ${BASE} | grep total | awk '{print $1}')"
+    FILE_JOB_SIZE="$(su -c "psql --username=${USER_POSTGRESQL} --no-password --command='SELECT datname, pg_size_pretty(pg_database_size(datname)) FROM pg_database';" -l ${USER_POSTGRESQL} | grep -i ${BASE} | awk '{print $3}')"
     STORAGE_SIZE="$(df -k ${STORAGE} | awk '{print $4}' | grep -vi 'available')"
 
     if [ ${FILE_JOB_SIZE} -ge ${STORAGE_SIZE} ]; then
@@ -359,17 +359,17 @@ sgbd_postgres_backup ()
 
         if [ "${FREE_DISK_AFTER_RECYCLE}" == "YES" ]; then
             su -c "/usr/bin/pg_dump ${BASE} | ${COMPRESS_ALG} -c \
-                > ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2" \
+                > ${STORAGE}/${TYPE}/${BASE}/${NAME}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2" \
                 -l ${USER_POSTGRESQL}
             
-            STATUS_COMPRESS="$(bzip2 --test ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 && echo $?)"
+            STATUS_COMPRESS="$(bzip2 --test ${STORAGE}/${TYPE}/${BASE}/${NAME}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2 && echo $?)"
         fi
     else
         su -c "/usr/bin/pg_dump ${BASE} | ${COMPRESS_ALG} -c \
-                > ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2" \
+                > ${STORAGE}/${TYPE}/${BASE}/${NAME}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2" \
                 -l ${USER_POSTGRESQL}
 
-        STATUS_COMPRESS="$(bzip2 --test ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 && echo $?)"
+        STATUS_COMPRESS="$(bzip2 --test ${STORAGE}/${TYPE}/${BASE}/${NAME}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2 && echo $?)"
     fi
 
     # Validation of compress
@@ -378,29 +378,29 @@ sgbd_postgres_backup ()
         JOB_REPORT_MSG_COMPRESS="[Info]: The backup was successfully compressed!"
 
         # Calculating backup size
-        BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 | awk '{print $1}')
+        BACKUP_SIZE=$(du -b ${STORAGE}/${TYPE}/${BASE}/${NAME}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2 | awk '{print $1}')
 
         # Threshold 100 MiB
         if [ "${BACKUP_SIZE}" -ge '104857600' ]; then
             mkdir -p ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${DATE_TODAY}
 
             # Fragments the backup into files smaller than 512MB each
-            split -b 100M -d ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 \
+            split -b 100M -d ${STORAGE}/${TYPE}/${BASE}/${NAME}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2 \
             ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.psql.bzip2_ 
 
             if [ "$?" -eq '0' ]; then
                 JOB_REPORT_STATUS_FRAGMENT="OK"
-                JOB_REPORT_MSG_FRAGMENT="[Info]: Backup [${NAME}-${DATE_TODAY}.psql.bzip2] was fragmented!"
+                JOB_REPORT_MSG_FRAGMENT="[Info]: Backup [${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2] was fragmented!"
             fi
 
             ### Call functions
             # Checksum # TODO => work with fragments
-            hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 \
-            ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.psql.bzip2_*   
+            hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2 \
+            ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2_*   
 
             if [ "$?" -eq '0' ]; then
                 JOB_REPORT_STATUS_CHECKSUM=OK
-                JOB_REPORT_MSG_CHECKSUM=$(cat ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE})
+                JOB_REPORT_MSG_CHECKSUM=$(cat ${STORAGE}/${TYPE}/${BASE}/${NAME}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE})
             fi
 
             ### Copy to AWS S3
@@ -409,22 +409,22 @@ sgbd_postgres_backup ()
                 aws_assume_role
 
                 # AWS S3 Sync
-                aws_s3sync ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${DATE_TODAY}.psql.bzip2_* \
-                ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE}
+                aws_s3sync ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${DATE_TODAY}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2_* \
+                ${STORAGE}/${TYPE}/${BASE}/${NAME}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE}
       
                 if [ "$?" -eq "0" ]; then
                     JOB_REPORT_STATUS_COPY="OK"        
-                    JOB_REPORT_MSG_COPY="[Info]: Backup [${NAME}-${DATE_TODAY}.psql.bzip2] was successfully copied!"
+                    JOB_REPORT_MSG_COPY="[Info]: Backup [${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2] was successfully copied!"
                     rm -rf ${STORAGE}/${TYPE}/${BASE}/${NAME}/fragments/${DATE_TODAY}
                 fi
             fi
         else
             ### Call functions
-            hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2
+            hash_checksum ${STORAGE}/${TYPE}/${BASE}/${NAME}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2
       
             if [ "$?" -eq '0' ]; then
                 JOB_REPORT_STATUS_CHECKSUM=OK
-                JOB_REPORT_MSG_CHECKSUM=$(cat ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE})
+                JOB_REPORT_MSG_CHECKSUM=$(cat ${STORAGE}/${TYPE}/${BASE}/${NAME}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE})
             fi 
 
             ### Copy to AWS S3
@@ -433,12 +433,12 @@ sgbd_postgres_backup ()
                 aws_assume_role
 
                 # AWS S3 Sync
-                aws_s3sync ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2 \
-               ${STORAGE}/${TYPE}/${BASE}/${NAME}/${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE}
+                aws_s3sync ${STORAGE}/${TYPE}/${BASE}/${NAME}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2 \
+               ${STORAGE}/${TYPE}/${BASE}/${NAME}/${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2.${CHECKSUM_TYPE}
       
                 if [ "$?" -eq "0" ]; then
                     JOB_REPORT_STATUS_COPY="OK"        
-                    JOB_REPORT_MSG_COPY="[Info]: Backup [${NAME}-${DATE_TODAY}.psql.bzip2] was successfully copied!"
+                    JOB_REPORT_MSG_COPY="[Info]: Backup [${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2] was successfully copied!"
                 fi
             fi
         fi
@@ -467,7 +467,7 @@ Copy         : ${JOB_REPORT_MSG_COPY}
 Recycle      : ${JOB_REPORT_MSG_RECYCLE}
 
 # Details
-Backup file  : ${BASE}-${DATE_TODAY}.psql.bzip2
+Backup file  : ${NAME}-${BASE}-${DATE_TODAY}.psql.bzip2
 Checksum     : ${JOB_REPORT_MSG_CHECKSUM}
 REPORTFILE
 
